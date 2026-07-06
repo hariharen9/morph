@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+dist/
+build/
+wheels/
+*.whl
+*.tar.gz
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Mypy / Pyright
+.mypy_cache/
+.pyright/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Editors
+*.swp
+*.swo
+*~
+
+# Test / temp output files
+*.xlsx
+*.csv
