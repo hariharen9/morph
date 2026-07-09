@@ -16,7 +16,7 @@ One command. No format-specific tools to remember. No cloud upload. No API keys.
 morph report.docx report.pdf
 morph data.csv data.xlsx --table-style TableStyleMedium2 --header-bg 2E7D32
 morph clip.mp4 clip.gif --fps 10 --width 480
-morph bundle.zip bundle.tar.gz
+morph batch '*.mp4' mp3 --workers 4
 ```
 
 </div>
@@ -38,26 +38,28 @@ intermediate formats automatically when there's no direct converter.
 
 ## Features
 
-- 🔀 **One verb.** `morph <input> <output>` — not `morph convert`. morph *is* the verb.
-- 🧭 **Smart multi-hop routing.** No direct `csv → yaml` converter? morph finds
+- **One verb.** `morph <input> <output>` — not `morph convert`. morph *is* the verb.
+- **Smart multi-hop routing.** No direct `csv → yaml` converter? morph finds
   `csv → json → yaml` on its own, and tells you it did.
-- 🎛️ **Full control, contextually.** `morph data.csv data.xlsx --help` shows exactly
-  the ~20 flags relevant to *that* pair — table styles, freeze panes, passwords —
+- **Full control, contextually.** `morph data.csv data.xlsx --help` shows exactly
+  the flags relevant to *that* pair — table styles, freeze panes, passwords —
   and nothing from unrelated converters.
-- 📦 **Cross-platform dependency management.** Missing `ffmpeg` or `pandoc`? morph
+- **Batch conversion.** `morph batch '*.mp4' mp3` converts many files in parallel
+  with a live Rich progress table, smart output strategies, and a clean summary.
+- **Conversion history.** Every conversion is logged to `~/.morph_history.jsonl`.
+  `morph history` shows a searchable, filterable table of past jobs.
+- **Cross-platform dependency management.** Missing `ffmpeg` or `pandoc`? morph
   detects your package manager (brew/apt/dnf/pacman/winget/choco/…), shows you the
   *exact* install command, and never runs it without asking first.
-- 🖥️ **A real interactive TUI**, not just flags — point at a file, see every format
-  it can reach, tune that pair's actual flags in a live form, and watch a real
-  progress bar (not a fake one) while it converts.
-- ⏱️ **Live execution feedback everywhere.** ffmpeg hops show a real progress bar
-  driven by ffmpeg's own `-progress` stream (percentage, speed, ETA) — not a
-  spinner pretending to be one. Everything else shows a spinner labeled with
-  which tool is actually doing the work (`via pandoc`, `via pillow`, ...), so
-  the terminal is never just sitting there silently.
-- 🧩 **Pluggable by design.** Drop a file in `morph/converters/`, call `register()`,
+- **A real interactive TUI**, fully keyboard-driven — type a path (with autocomplete
+  dropdown for filesystem suggestions), arrow through formats (options update live),
+  and watch a real progress bar while it converts. No mouse needed.
+- **Live execution feedback.** ffmpeg hops show a real progress bar driven by
+  ffmpeg's own `-progress` stream. Everything else shows a spinner labeled with
+  which tool is working (`via pandoc`, `via pillow`, ...).
+- **Pluggable by design.** Drop a file in `morph/converters/`, call `register()`,
   and it's live — no central registry to edit.
-- 🔒 **Local-first.** Nothing leaves your machine. No accounts, no upload, no API keys.
+- **Local-first.** Nothing leaves your machine. No accounts, no upload, no API keys.
 
 ## Installation
 
@@ -70,20 +72,7 @@ pip install -e .
 That's it for **data, image, and archive** conversions — pure Python, zero external
 binaries. **Documents** (docx/pdf/html/…) need `pandoc`; **audio/video** need
 `ffmpeg`. You don't need to install these up front — morph detects what a given
-conversion needs and prompts you the first time you hit it:
-
-```
-$ morph slides.docx slides.pdf
-
-╭─────────────── Missing dependency ────────────────╮
-│ pandoc converts between document formats (docx,   │
-│ md, html, epub, ...), but it isn't installed.      │
-│                                                     │
-│ morph can install it with:                         │
-│   sudo apt install -y pandoc                       │
-╰─────────────────────────────────────────────────────╯
-Run this now? [Y/n]
-```
+conversion needs and prompts you the first time you hit it.
 
 Check what's available any time:
 
@@ -101,12 +90,21 @@ morph data.csv data.yaml                     # routed through json automatically
 
 # Documents (pandoc)
 morph notes.md notes.docx
-morph report.docx report.pdf                 # auto-picks a working PDF engine
+morph report.docx report.pdf
 morph book.epub book.html
 
-# Images (Pillow)
+# Images (Pillow + cairosvg)
 morph photo.png photo.webp --quality 80 --resize 1200x
 morph icon.png icon.ico                      # multi-resolution ICO
+morph diagram.svg diagram.png
+
+# Fonts (fontTools)
+morph font.ttf font.woff2
+morph font.woff font.otf
+
+# Ebooks (Calibre)
+morph book.epub book.mobi
+morph book.epub book.azw3
 
 # Audio / video (ffmpeg)
 morph song.wav song.mp3 --bitrate 192k
@@ -116,13 +114,84 @@ morph clip.mp4 clip.gif --fps 10 --width 480
 
 # Archives
 morph project.zip project.tar.gz
-```
 
-No args? You get the TUI:
-
-```bash
+# No args — interactive TUI
 morph
 ```
+
+### Batch conversion
+
+Convert many files at once with a live progress display:
+
+```bash
+# All MP4s → MP3, 4 parallel workers
+morph batch '*.mp4' mp3 --workers 4
+
+# Whole directory, recursive, into a separate output folder
+morph batch ./raw/ mp3 --recursive --out-dir ./converted/
+
+# Mirror the input directory structure
+morph batch ./raw/ mp3 --recursive --out-dir ./converted/ --mirror
+
+# Custom output name template
+morph batch '*.mp4' mp3 --rename '{stem}_audio'
+# → myvideo_audio.mp3
+
+# Skip files whose output already exists
+morph batch '*.mp4' mp3 --skip-existing
+
+# Only re-convert if input is newer than output (like make)
+morph batch '*.mp4' mp3 --newer-only
+
+# Preview what would happen — no conversion
+morph batch '*.mp4' mp3 --dry-run
+
+# Multiple patterns at once
+morph batch '*.flac' '*.wav' mp3
+
+# Pass converter flags through
+morph batch '*.mp4' mp3 --bitrate 192k
+```
+
+During conversion, morph shows a live table:
+
+```
+╭─ morph batch — 8 files → mp3 ─────────────────────────────────────╮
+│  Status          File                    Time      Size             │
+│  ✓ done          concert_01.flac         0:00:04   8.3MB → 4.1MB   │
+│  ✓ done          concert_02.flac         0:00:03   7.9MB → 3.8MB   │
+│  ▶ converting…   concert_03.flac         0:00:01                    │
+│  · waiting       concert_04.wav                                     │
+│                                                                      │
+│  Overall  ████████░░░░░░░░  2/8  [0:00:07]                          │
+╰──────────────────────────────────────────────────────────────────────╯
+```
+
+### Conversion history
+
+Every conversion (single and batch) is automatically logged:
+
+```bash
+morph history               # last 20 conversions
+morph history -n 50         # last 50
+morph history --failed      # only failures
+morph history --fmt mp4     # filter by format
+morph history --clear       # wipe history
+morph history --json        # raw JSONL output (for scripting)
+```
+
+```
+┌──────────┬──────┬──────┬────────────────┬────────┬────────────┐
+│ When     │ From │ To   │ File           │ Mode   │ Status     │
+├──────────┼──────┼──────┼────────────────┼────────┼────────────┤
+│ 2m ago   │ md   │ docx │ README.md      │ single │ ✓ 1.8s     │
+│ 1h ago   │ mp4  │ mp3  │ intro.mp4      │ batch  │ ✓ 4.2s     │
+│ yesterday│ csv  │ xlsx │ data.csv       │ single │ ✓ 0.1s     │
+└──────────┴──────┴──────┴────────────────┴────────┴────────────┘
+```
+
+History is stored at `~/.morph_history.jsonl` — one JSON object per line,
+easy to parse with `jq` or Python.
 
 ### Every conversion is self-documenting
 
@@ -136,66 +205,73 @@ $ morph data.csv data.xlsx --help
 
 Options for this conversion (csv → xlsx):
  -d, --delimiter    Field delimiter. Auto-detected if omitted.
- -e, --encoding     Input encoding. Auto-detected if omitted.
  --table-style      Excel table style name.  (default: TableStyleMedium9)
  --header-bg        Header background hex colour (no #).  (default: 1F3864)
  --freeze-cols      Left-most columns to freeze.
  --password         Password-protect the output sheet.
- ... (20 more)
+ ... (more)
 ```
 
-The exact same file pointed at `report.pdf` shows a completely different, much
+The exact same file pointed at `report.pdf` shows a completely different,
 shorter flag set — because pandoc's PDF pipeline genuinely only has one knob
-(`--pdf-engine`) worth exposing.
+worth exposing.
 
-### See what's reachable before you commit
+### See what's reachable
 
 ```bash
+# Tree view grouped by family — great for discovery
+$ morph formats
+  morph — 45 formats across 8 families
+
+  * document  (11 formats, via pandoc, 82 direct routes)
+  ├── md    → docx epub html latex odt pdf rst rtf txt
+  ├── docx  → epub html latex md odt pdf rst rtf txt
+  └── ...
+
+  * audio  (6 formats, via ffmpeg, 30 direct routes)
+  ├── mp3  → aac flac m4a ogg wav
+  └── ...
+
+# Per-format table — see everything reachable from one format
 $ morph formats mp4
 ┌────────┬──────────────────┬──────┐
 │ Target │ Route            │ Hops │
 ├────────┼──────────────────┼──────┤
 │ mp3    │ mp4 → mp3        │    1 │
 │ gif    │ mp4 → gif        │    1 │
-│ png    │ mp4 → gif → png  │    2 │   ← grabs a frame, discovered automatically
 │ webm   │ mp4 → webm       │    1 │
 │ ...    │ ...              │  ... │
 └────────┴──────────────────┴──────┘
 ```
 
-That `mp4 → gif → png` row isn't a hand-written "extract a frame" feature — it
-fell out of the video and image domains sharing a format (`gif`) in the graph.
-This is the payoff of routing everything through one registry instead of N
-separate tools: capabilities compose without anyone writing the composition.
-
-## Supported formats today
+## Supported formats
 
 | Domain | Formats | Backend |
 |---|---|---|
 | **Data** | csv, xlsx, json, yaml | native (pandas / openpyxl) |
 | **Documents** | md, html, docx, odt, rtf, epub, latex, rst, txt, pdf* | pandoc |
-| **Images** | png, jpg/jpeg, webp, bmp, gif, tiff, ico, svg (in only) | Pillow / cairosvg |
+| **Images** | png, jpg/jpeg, webp, bmp, gif, tiff, ico, svg (input only) | Pillow / cairosvg |
 | **Fonts** | ttf, otf, woff, woff2 | fontTools |
 | **Ebooks** | epub, mobi, azw3 | Calibre (`ebook-convert`) |
 | **Audio** | mp3, wav, flac, ogg, aac, m4a | ffmpeg |
 | **Video** | mp4, mkv, mov, webm, avi (+ → audio, + → gif) | ffmpeg |
 | **Archives** | zip, tar, tar.gz, tar.bz2, tar.xz | stdlib |
 
-<sub>*pdf is output-only everywhere — nothing in morph reads PDFs back into
-structured content, since that's a fundamentally lossier operation than every
-other conversion here.</sub>
+<sub>*pdf is output-only — morph doesn't read PDFs back into structured content,
+since that's a fundamentally lossier operation than every other conversion here.</sub>
 
-Run `morph formats` for the full live list, or `morph formats <fmt>` to see
-everything reachable from a given format, direct or chained.
-
-## Architecture, in brief
+## Architecture
 
 ```
 morph/
-├── registry.py          # the graph: register(src, dst, ...) edges + BFS routing
-├── deps.py               # cross-platform dependency detection & guarded installer
-├── cli.py                # dispatch: "morph x y" → hidden `run` command
-├── tui.py                # Textual app, same engine as the CLI
+├── cli.py                # dispatch + all subcommands (run, batch, formats, history, deps)
+├── registry.py           # the graph: register(src, dst) edges + BFS routing
+├── batch.py              # parallel batch engine: ThreadPoolExecutor + Rich Live display
+├── history.py            # JSONL log at ~/.morph_history.jsonl
+├── deps.py               # cross-platform dep detection & guarded installer
+├── progress.py           # Rich progress bars for the CLI
+├── ffmpeg_utils.py       # ffmpeg -progress pipe parser for real % tracking
+├── tui.py                # Textual keyboard-driven TUI (same engine as CLI)
 └── converters/
     ├── __init__.py       # auto-discovers every file below — nothing to register by hand
     ├── csv_to_xlsx.py    # self-contained: engine + OptionSpecs + register() in one file
@@ -204,9 +280,12 @@ morph/
     ├── json_yaml.py
     ├── documents.py      # one generic pandoc engine, many pairs
     ├── images.py         # one generic Pillow engine, many pairs
-    ├── audio.py
-    ├── video.py
-    └── archives.py
+    ├── svg.py            # cairosvg for SVG → raster/PDF
+    ├── audio.py          # ffmpeg with real progress tracking
+    ├── video.py          # ffmpeg, includes → gif + audio extraction
+    ├── archives.py
+    ├── fonts.py          # fontTools: ttf/otf/woff/woff2
+    └── ebooks.py         # Calibre ebook-convert
 ```
 
 Every converter is a function `(input_path, output_path, **options) -> ConversionResult`,
@@ -220,34 +299,44 @@ per-pair `--help` possible.
 Drop a file in `morph/converters/`:
 
 ```python
-# morph/converters/svg_png.py
+# morph/converters/my_converter.py
 from pathlib import Path
 from ..registry import ConversionResult, OptionSpec, register
 
 OPTIONS = [
-    OptionSpec("width", ("--width",), "Output width in pixels.", type=int),
+    OptionSpec("quality", ("--quality",), "Output quality (1-100).", default=85, type=int),
 ]
 
-@register("svg", "png", backend="cairosvg", requires_binary=None,
-          family="image", options=OPTIONS)
-def svg_to_png(input_path: Path, output_path: Path, *, width=None, **_options) -> ConversionResult:
-    import cairosvg
-    cairosvg.svg2png(url=str(input_path), write_to=str(output_path), output_width=width)
+@register("foo", "bar", backend="sometool", family="image", options=OPTIONS)
+def foo_to_bar(input_path: Path, output_path: Path, *, quality=85, **_) -> ConversionResult:
+    # ... do the conversion ...
     return ConversionResult(output=output_path)
 ```
 
 That's the whole integration. No imports to add elsewhere, no CLI wiring —
-`converters/__init__.py` picks it up automatically, `morph x.svg y.png` works
-immediately, and it slots into the routing graph for free (so e.g. anything
-that could already reach `.svg` can now reach `.png` too, if that helps).
+`converters/__init__.py` picks it up automatically, `morph x.foo y.bar` works
+immediately, and it slots into the routing graph so anything that could reach
+`.foo` can now reach `.bar` too.
+
+## CLI reference
+
+```
+morph <input> <output> [OPTIONS]     # convert a single file
+morph <input> <output> --help        # show flags for THIS conversion only
+morph batch <patterns...> <format>   # batch convert (see morph batch --help)
+morph formats                        # tree of all formats by family
+morph formats <fmt>                  # everything reachable from <fmt>
+morph history                        # recent conversion log
+morph deps                           # check / install external tools
+morph                                # launch the interactive TUI
+```
 
 ## Roadmap
 
-- [ ] Per-pair codec tuning for audio/video (currently relies on ffmpeg's
-      container-inferred defaults, which are correct but not always optimal)
+- [ ] Per-pair codec tuning for audio/video (currently relies on ffmpeg defaults)
 - [ ] HEIC/AVIF image support (pillow-heif / pillow-avif)
-- [ ] `morph batch` for glob-based multi-file jobs
-- [ ] Automated test suite (everything so far has been verified by hand, per PR)
+- [ ] `~/.morphrc` config file for persistent flag defaults
+- [ ] Automated test suite
 
 ## Contributing
 

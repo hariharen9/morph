@@ -173,6 +173,28 @@ class Registry:
                 seen.append(spec.requires_binary)
         return seen
 
+    def formats_by_family(self) -> dict[str, set[str]]:
+        """All formats grouped by their converter family."""
+        families: dict[str, set[str]] = {}
+        for spec in self._edges.values():
+            families.setdefault(spec.family, set()).add(spec.src)
+            families.setdefault(spec.family, set()).add(spec.dst)
+        return families
+
+    def edges_by_family(self) -> dict[str, list[ConverterSpec]]:
+        """All direct edges grouped by family."""
+        families: dict[str, list[ConverterSpec]] = {}
+        for spec in self._edges.values():
+            families.setdefault(spec.family, []).append(spec)
+        return families
+
+    def family_backends(self) -> dict[str, set[str]]:
+        """Primary backends used by each family."""
+        result: dict[str, set[str]] = {}
+        for spec in self._edges.values():
+            result.setdefault(spec.family, set()).add(spec.backend)
+        return result
+
 
 def _norm(fmt: str) -> str:
     return fmt.lower().lstrip(".")
