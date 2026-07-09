@@ -31,6 +31,7 @@ from typer.core import TyperGroup
 
 from . import converters  # noqa: F401  (auto-discovers & registers every converter)
 from . import deps
+from .progress import run_hop
 from .registry import detect_format, registry
 
 THEME = Theme({
@@ -166,7 +167,7 @@ def run_cmd(
                 is_last = i == len(path) - 1
                 hop_out = output_file if is_last else Path(tmpdir) / f"hop{i}.{spec.dst}"
                 hop_options = {opt.name: options_dict[opt.name] for opt in spec.options}
-                result = spec.func(current_input, hop_out, **hop_options)
+                result = run_hop(spec, current_input, hop_out, hop_options, console, quiet=quiet)
                 current_input = result.output
     except Exception as exc:
         err_console.print(f"\n[error]✗ Conversion failed at step '{spec.src} → {spec.dst}':[/error] {exc}")

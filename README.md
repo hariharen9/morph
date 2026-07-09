@@ -48,7 +48,13 @@ intermediate formats automatically when there's no direct converter.
   detects your package manager (brew/apt/dnf/pacman/winget/choco/…), shows you the
   *exact* install command, and never runs it without asking first.
 - 🖥️ **A real interactive TUI**, not just flags — point at a file, see every format
-  it can reach, pick one.
+  it can reach, tune that pair's actual flags in a live form, and watch a real
+  progress bar (not a fake one) while it converts.
+- ⏱️ **Live execution feedback everywhere.** ffmpeg hops show a real progress bar
+  driven by ffmpeg's own `-progress` stream (percentage, speed, ETA) — not a
+  spinner pretending to be one. Everything else shows a spinner labeled with
+  which tool is actually doing the work (`via pandoc`, `via pillow`, ...), so
+  the terminal is never just sitting there silently.
 - 🧩 **Pluggable by design.** Drop a file in `morph/converters/`, call `register()`,
   and it's live — no central registry to edit.
 - 🔒 **Local-first.** Nothing leaves your machine. No accounts, no upload, no API keys.
@@ -168,13 +174,16 @@ separate tools: capabilities compose without anyone writing the composition.
 |---|---|---|
 | **Data** | csv, xlsx, json, yaml | native (pandas / openpyxl) |
 | **Documents** | md, html, docx, odt, rtf, epub, latex, rst, txt, pdf* | pandoc |
-| **Images** | png, jpg/jpeg, webp, bmp, gif, tiff, ico | Pillow |
+| **Images** | png, jpg/jpeg, webp, bmp, gif, tiff, ico, svg (in only) | Pillow / cairosvg |
+| **Fonts** | ttf, otf, woff, woff2 | fontTools |
+| **Ebooks** | epub, mobi, azw3 | Calibre (`ebook-convert`) |
 | **Audio** | mp3, wav, flac, ogg, aac, m4a | ffmpeg |
 | **Video** | mp4, mkv, mov, webm, avi (+ → audio, + → gif) | ffmpeg |
 | **Archives** | zip, tar, tar.gz, tar.bz2, tar.xz | stdlib |
 
-<sub>*pdf is output-only — pandoc can't reliably parse PDFs back into structured
-content, so it never appears as a source format.</sub>
+<sub>*pdf is output-only everywhere — nothing in morph reads PDFs back into
+structured content, since that's a fundamentally lossier operation than every
+other conversion here.</sub>
 
 Run `morph formats` for the full live list, or `morph formats <fmt>` to see
 everything reachable from a given format, direct or chained.
@@ -234,12 +243,11 @@ that could already reach `.svg` can now reach `.png` too, if that helps).
 
 ## Roadmap
 
-- [ ] Fonts (ttf/otf/woff/woff2) via fontTools
-- [ ] Ebooks (epub/mobi/azw3) via Calibre's `ebook-convert`
-- [ ] HEIC/AVIF image support (pillow-heif / pillow-avif)
 - [ ] Per-pair codec tuning for audio/video (currently relies on ffmpeg's
       container-inferred defaults, which are correct but not always optimal)
+- [ ] HEIC/AVIF image support (pillow-heif / pillow-avif)
 - [ ] `morph batch` for glob-based multi-file jobs
+- [ ] Automated test suite (everything so far has been verified by hand, per PR)
 
 ## Contributing
 

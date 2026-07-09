@@ -57,6 +57,7 @@ class ConverterSpec:
     description: str = ""
     lossy: bool = False                # flag conversions that can't round-trip cleanly
     options: tuple[OptionSpec, ...] = field(default_factory=tuple)
+    supports_progress: bool = False    # True if func accepts a `_progress(frac, status)` kwarg
 
     @property
     def key(self) -> tuple[str, str]:
@@ -78,6 +79,7 @@ class Registry:
         description: str = "",
         lossy: bool = False,
         options: Optional[list[OptionSpec]] = None,
+        supports_progress: bool = False,
     ):
         """Decorator: register `func` as a converter for src -> dst."""
         def deco(func: Callable[..., ConversionResult]):
@@ -85,7 +87,7 @@ class Registry:
                 src=_norm(src), dst=_norm(dst), func=func, backend=backend,
                 requires_binary=requires_binary, family=family,
                 description=description, lossy=lossy,
-                options=tuple(options or ()),
+                options=tuple(options or ()), supports_progress=supports_progress,
             )
             self._edges[spec.key] = spec
             return func

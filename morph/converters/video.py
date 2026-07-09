@@ -4,14 +4,16 @@ converters/video.py — video family, powered by ffmpeg.
 Includes two genuinely useful cross-domain edges beyond video<->video:
   • video -> audio  (extract the audio track, e.g. mp4 -> mp3)
   • video -> gif    (short animated clips; palette-generated for quality)
+
+Every hop reports real fractional progress via ffmpeg's -progress stream.
 """
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Optional
 
+from ..ffmpeg_utils import ProgressCallback, run_ffmpeg
 from ..registry import ConversionResult, OptionSpec, register
 from .audio import FORMATS as AUDIO_FORMATS
 
@@ -29,13 +31,6 @@ _COMMON_OPTIONS = [
 ]
 
 
-def _run_ffmpeg(cmd: list[str]) -> None:
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        tail = "\n".join(result.stderr.strip().splitlines()[-6:])
-        raise RuntimeError(f"ffmpeg failed:\n{tail}")
-
-
 def _input_seek_args(start: Optional[str], duration: Optional[str]) -> list[str]:
     args = []
     if start:
@@ -49,7 +44,8 @@ def _video_convert(input_path: Path, output_path: Path, *, resolution: Optional[
                     fps: Optional[int] = None, crf: Optional[int] = None,
                     video_codec: Optional[str] = None, audio_codec: Optional[str] = None,
                     no_audio: bool = False, start: Optional[str] = None,
-                    duration: Optional[str] = None, **_options) -> ConversionResult:
+                    duration: Optional[str] = None, _progress: Optional[ProgressCallback] = None,
+                    **_options) -> ConversionResult:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-loglevel", "error", *_input_seek_args(start, duration), "-i", str(input_path)]
 
@@ -71,13 +67,13 @@ def _video_convert(input_path: Path, output_path: Path, *, resolution: Optional[
         cmd += ["-c:a", audio_codec]
 
     cmd.append(str(output_path))
-    _run_ffmpeg(cmd)
+    run_ffmpeg(cmd, input_path=input_path, progress=_progress)
     return ConversionResult(output=output_path)
 
 
 def _extract_audio(input_path: Path, output_path: Path, *, bitrate: Optional[str] = None,
                     sample_rate: Optional[int] = None, channels: Optional[int] = None,
-                    **_options) -> ConversionResult:
+                    _progress: Optional[ProgressCallback] = None, **_options) -> ConversionResult:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(input_path), "-vn"]
     if bitrate:
@@ -87,7 +83,7 @@ def _extract_audio(input_path: Path, output_path: Path, *, bitrate: Optional[str
     if channels:
         cmd += ["-ac", str(channels)]
     cmd.append(str(output_path))
-    _run_ffmpeg(cmd)
+    run_ffmpeg(cmd, input_path=input_path, progress=_progress)
     return ConversionResult(output=output_path)
 
 
@@ -101,12 +97,12 @@ _GIF_OPTIONS = [
 
 def _to_gif(input_path: Path, output_path: Path, *, fps: int = 10, width: int = 480,
             start: Optional[str] = None, duration: Optional[str] = None,
-            **_options) -> ConversionResult:
+            _progress: Optional[ProgressCallback] = None, **_options) -> ConversionResult:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     vf = f"fps={fps},scale={width}:-1:flags=lanczos"
     cmd = ["ffmpeg", "-y", "-loglevel", "error", *_input_seek_args(start, duration),
            "-i", str(input_path), "-vf", vf, "-loop", "0", str(output_path)]
-    _run_ffmpeg(cmd)
+    run_ffmpeg(cmd, input_path=input_path, progress=_progress)
     return ConversionResult(output=output_path, extra={"note": "single-pass palette; use --fps/--width to tune size"})
 
 
@@ -117,7 +113,7 @@ for _src in FORMATS:
             continue
         register(
             _src, _dst, backend="ffmpeg", requires_binary="ffmpeg", family="video",
-            description=f"{_src} → {_dst} (ffmpeg)", options=_COMMON_OPTIONS,
+            description=f"{_src} → {_dst} (ffmpeg)", options=_COMMON_OPTIONS, supports_progress=True,
         )(_video_convert)
 
 # video -> audio (extract track)
@@ -131,12 +127,12 @@ for _src in FORMATS:
         register(
             _src, _dst, backend="ffmpeg", requires_binary="ffmpeg", family="video",
             description=f"{_src} → {_dst} (extract audio track)", lossy=True,
-            options=_EXTRACT_AUDIO_OPTIONS,
+            options=_EXTRACT_AUDIO_OPTIONS, supports_progress=True,
         )(_extract_audio)
 
 # video -> gif
 for _src in FORMATS:
     register(
         _src, "gif", backend="ffmpeg", requires_binary="ffmpeg", family="video",
-        description=f"{_src} → gif", lossy=True, options=_GIF_OPTIONS,
+        description=f"{_src} → gif", lossy=True, options=_GIF_OPTIONS, supports_progress=True,
     )(_to_gif)

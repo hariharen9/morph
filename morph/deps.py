@@ -50,6 +50,10 @@ _INSTALL_CMD = {
 _PACKAGE_NAMES: dict[str, dict[str, str]] = {
     "ffmpeg": {"winget": "Gyan.FFmpeg", "scoop": "ffmpeg"},
     "pandoc": {"winget": "JohnMacFarlane.Pandoc"},
+    "ebook-convert": {
+        "apt": "calibre", "dnf": "calibre", "pacman": "calibre",
+        "brew": "calibre", "winget": "calibre.calibre", "choco": "calibre",
+    },
     "soffice": {  # LibreOffice headless binary
         "apt": "libreoffice", "dnf": "libreoffice", "pacman": "libreoffice-fresh",
         "brew": "libreoffice", "winget": "TheDocumentFoundation.LibreOffice",
@@ -64,6 +68,7 @@ _WHY = {
     "soffice": "converts legacy office formats pandoc can't read directly",
     "wkhtmltopdf": "renders documents to PDF (a lightweight PDF engine)",
     "xelatex": "renders documents to PDF with full LaTeX/typography support",
+    "ebook-convert": "converts ebook formats (epub, mobi, azw3) — ships as part of Calibre",
 }
 
 
