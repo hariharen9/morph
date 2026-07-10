@@ -255,6 +255,7 @@ $ morph formats mp4
 | **Ebooks** | epub, mobi, azw3 | Calibre (`ebook-convert`) |
 | **Audio** | mp3, wav, flac, ogg, aac, m4a, opus, wma | ffmpeg |
 | **Video** | mp4, mkv, mov, webm, avi, flv, wmv, mpeg (+ → audio, + → gif/webp, + → srt/vtt) | ffmpeg |
+| **OCR** | png, jpg, webp, pdf, etc. → txt | tesseract |
 | **Archives** | zip, tar, tar.gz, tar.bz2, tar.xz | stdlib |
 
 <sub>*pdf is output-only — morph doesn't read PDFs back into structured content,

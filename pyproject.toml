@@ -30,6 +30,7 @@ dependencies = [
     "pillow-avif-plugin>=1.4.3",
     "cairosvg>=2.7.1",
     "fonttools[woff]>=4.50.0",
+    "pytesseract>=0.3.10",
 ]
 
 [project.scripts]
