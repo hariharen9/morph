@@ -30,3 +30,17 @@ def test_url_to_html(tmp_path, mocker):
     
     assert result.output.exists()
     assert result.output.read_text(encoding="utf-8") == "<html><body>Raw dump</body></html>"
+
+
+def test_url_to_md_dynamic(tmp_path, mocker):
+    mock_dynamic = mocker.patch("morph.converters.web._fetch_dynamic", return_value="# Mock Dynamic")
+    
+    out_file = tmp_path / "out_dyn.md"
+    url = "https://example.com/js"
+    
+    result = url_to_md(url, out_file, js=True)
+    
+    mock_dynamic.assert_called_once_with(url, "markdown")
+    assert result.output.exists()
+    assert result.output.read_text(encoding="utf-8") == "# Mock Dynamic"
+

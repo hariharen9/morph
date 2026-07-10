@@ -151,6 +151,7 @@ def run_cmd(
     ctx: typer.Context,
     input_file: str = typer.Argument(..., help="Source file or URL (http/https)."),
     output_file: Path = typer.Argument(..., help="Destination file (extension picks the target format)."),
+    js: bool = typer.Option(False, "--js", help="Use headless browser to render JavaScript on URLs."),
     yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm dependency installs."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show the conversion plan without running it."),
     quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress banners and tables."),
@@ -177,6 +178,11 @@ def run_cmd(
     if unknown:
         err_console.print(f"[warning]⚠ Ignoring unrecognized option(s):[/warning] {' '.join(unknown)}")
     options_dict = vars(parsed)
+    options_dict["js"] = js
+    
+    if js and path and path[0].src == "url":
+        import dataclasses
+        path[0] = dataclasses.replace(path[0], backend="crawl4ai")
 
     is_url = src == "url"
     input_path = input_file if is_url else Path(input_file)

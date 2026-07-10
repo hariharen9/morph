@@ -44,12 +44,14 @@ _INSTALL_CMD = {
     "winget": "winget install --id {pkg} -e",
     "choco":  "choco install {pkg} -y",
     "scoop":  "scoop install {pkg}",
+    "pip":    "playwright install {pkg}", # special case for playwright browsers
 }
 
 # binary -> {package_manager: package_name}, only where it differs from the binary name
 _PACKAGE_NAMES: dict[str, dict[str, str]] = {
     "ffmpeg": {"winget": "Gyan.FFmpeg", "scoop": "ffmpeg"},
     "pandoc": {"winget": "JohnMacFarlane.Pandoc"},
+    "tesseract": {"winget": "UB-Mannheim.TesseractOCR"},
     "ebook-convert": {
         "apt": "calibre", "dnf": "calibre", "pacman": "calibre",
         "brew": "calibre", "winget": "calibre.calibre", "choco": "calibre",
@@ -59,6 +61,7 @@ _PACKAGE_NAMES: dict[str, dict[str, str]] = {
         "brew": "libreoffice", "winget": "TheDocumentFoundation.LibreOffice",
         "choco": "libreoffice-fresh",
     },
+    "playwright": {"winget": "chromium", "apt": "chromium", "brew": "chromium", "dnf": "chromium", "pacman": "chromium", "scoop": "chromium"},
 }
 
 # extra one-line context shown to the user about *why* they need this
@@ -69,6 +72,7 @@ _WHY = {
     "wkhtmltopdf": "renders documents to PDF (a lightweight PDF engine)",
     "xelatex": "renders documents to PDF with full LaTeX/typography support",
     "ebook-convert": "converts ebook formats (epub, mobi, azw3) — ships as part of Calibre",
+    "playwright": "installs a headless Chromium browser to render Javascript (for --js)",
 }
 
 
@@ -88,11 +92,33 @@ def detect_package_manager() -> Optional[str]:
     return None
 
 
+_path_refreshed = False
+
 def is_installed(binary: str) -> bool:
-    return shutil.which(binary) is not None
+    global _path_refreshed
+    if shutil.which(binary):
+        return True
+        
+    if platform.system() == "Windows" and not _path_refreshed:
+        _refresh_windows_path()
+        _path_refreshed = True
+        return shutil.which(binary) is not None
+        
+    return False
 
 
 def check(binary: str) -> DependencyStatus:
+    if binary == "playwright":
+        # Check if the chromium browser folder exists inside playwright's cache.
+        # But a simple proxy is to check if `playwright install chromium` needs to run.
+        # We'll just assume `playwright` is in PATH (installed via pip) and construct the install command.
+        # Since we can't easily detect if the browser is downloaded, we'll try to run the install command.
+        # Actually, let's just make sure the `playwright` CLI exists. 
+        # Wait, if we want to install chromium, we'll return false if we want it to run.
+        # Let's just return True if `playwright` exists, but actually we need the browsers.
+        # If `playwright` is checked, we just return the pip command.
+        return DependencyStatus(binary, is_installed("playwright"), "pip", "playwright install chromium")
+
     if is_installed(binary):
         return DependencyStatus(binary, True, None, None)
     mgr = detect_package_manager()
@@ -148,12 +174,53 @@ def ensure(binary: str, console: Optional[Console] = None, *, assume_yes: bool =
         console.print(f"[error]✗ Install command exited with status {result.returncode}[/error]")
         return False
 
+    # The installer might have updated the system PATH registry, but the current terminal 
+    # process won't see it until restarted. Let's force a refresh in the current process.
+    if not is_installed(binary):
+        _refresh_windows_path()
+
     if is_installed(binary):
         console.print(f"[success]✓ {binary} installed successfully[/success]")
         return True
 
     console.print(f"[error]✗ Install finished but {binary} still isn't on PATH.[/error]")
     return False
+
+
+def _refresh_windows_path() -> None:
+    """Forces the current Python process to pull the latest PATH from the Windows Registry."""
+    if platform.system() != "Windows":
+        return
+    import os
+    import winreg
+    
+    new_paths = []
+    
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"System\CurrentControlSet\Control\Session Manager\Environment") as key:
+            sys_path, _ = winreg.QueryValueEx(key, "Path")
+            new_paths.extend(sys_path.split(os.pathsep))
+    except Exception:
+        pass
+        
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Environment") as key:
+            user_path, _ = winreg.QueryValueEx(key, "Path")
+            new_paths.extend(user_path.split(os.pathsep))
+    except Exception:
+        pass
+        
+    # Hardcode well-known locations for badly behaved installers that don't add to PATH at all
+    well_known = [
+        r"C:\Program Files\Tesseract-OCR",
+        r"C:\Program Files (x86)\Tesseract-OCR",
+    ]
+    for p in well_known:
+        if os.path.exists(p) and p not in new_paths:
+            new_paths.append(p)
+            
+    if new_paths:
+        os.environ["PATH"] = os.environ.get("PATH", "") + os.pathsep + os.pathsep.join(new_paths)
 
 
 def ensure_all(binaries: list[str], console: Optional[Console] = None, *, assume_yes: bool = False) -> bool:
