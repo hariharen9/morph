@@ -104,6 +104,11 @@ app = typer.Typer(
 def _fmt_of(path: str | Path) -> str:
     path_str = str(path).lower()
     if path_str.startswith("http://") or path_str.startswith("https://"):
+        import urllib.parse
+        parsed = urllib.parse.urlparse(path_str)
+        ext = Path(parsed.path).suffix.lstrip(".")
+        if ext and ext in registry.all_formats():
+            return ext
         return "url"
     if isinstance(path, str):
         path = Path(path)
@@ -268,16 +273,43 @@ def run_cmd(
     if js and path and path[0].src == "url":
         import dataclasses
         path[0] = dataclasses.replace(path[0], backend="crawl4ai")
+        
+    is_webpage_scrape = src == "url"
+    is_remote_file = str(input_file).lower().startswith("http") and not is_webpage_scrape
+    
+    temp_download = None
+    if is_remote_file:
+        import urllib.request
+        from rich.progress import Progress
+        
+        err_console.print(f"[info]↓ Downloading remote file...[/info]")
+        temp_download = tempfile.NamedTemporaryFile(suffix="." + src, delete=False)
+        input_path = Path(temp_download.name)
+        
+        try:
+            with Progress(console=err_console, transient=True) as progress:
+                task = progress.add_task("[cyan]Downloading...", total=None)
+                
+                def report(blocknum, blocksize, totalsize):
+                    if totalsize > 0 and progress.tasks[task].total is None:
+                        progress.update(task, total=totalsize)
+                    progress.update(task, advance=blocksize)
+                
+                urllib.request.urlretrieve(input_file, temp_download.name, reporthook=report)
+        except Exception as e:
+            err_console.print(f"[error]✗ Download failed:[/error] {e}")
+            temp_download.close()
+            Path(temp_download.name).unlink(missing_ok=True)
+            raise typer.Exit(1)
+    else:
+        input_path = input_file if is_webpage_scrape else Path(input_file)
 
-    is_url = src == "url"
-    input_path = input_file if is_url else Path(input_file)
-
-    if not is_url and not input_path.exists():
+    if not is_webpage_scrape and not is_remote_file and not input_path.exists():
         err_console.print(f"[error]✗ File not found:[/error] {input_file}")
         raise typer.Exit(1)
 
     hop_str = " → ".join([src] + [s.dst for s in path])
-    display_name = input_file if is_url else input_path.name
+    display_name = input_file if (is_webpage_scrape or is_remote_file) else input_path.name
     if not quiet:
         console.print(Panel.fit(
             f"[bold]{display_name}[/bold] → [bold]{output_file.name}[/bold]\n"
@@ -325,7 +357,10 @@ def run_cmd(
             error=error_msg,
         )
         hist.append_entry(entry)
-
+        
+        if temp_download is not None:
+            temp_download.close()
+            Path(temp_download.name).unlink(missing_ok=True)
     if not quiet and result is not None:
         extras = []
         if result.rows is not None:

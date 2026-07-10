@@ -50,3 +50,17 @@ def test_config_command(monkeypatch, tmp_path):
     result2 = runner.invoke(app, ["config"])
     assert result2.exit_code == 1
     assert "already exists" in result2.stdout
+
+def test_remote_file_download(monkeypatch, tmp_path):
+    import urllib.request
+    from pathlib import Path
+    
+    def mock_urlretrieve(url, filename, reporthook=None):
+        Path(filename).write_text("dummy remote content", encoding="utf-8")
+        if reporthook:
+            reporthook(1, 1024, 1024)
+            
+    monkeypatch.setattr(urllib.request, "urlretrieve", mock_urlretrieve)
+    result = runner.invoke(app, ["https://example.com/data.txt", str(tmp_path / "out.md")])
+    assert result.exit_code == 0
+    assert (tmp_path / "out.md").exists()

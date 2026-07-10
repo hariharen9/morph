@@ -60,6 +60,7 @@ intermediate formats automatically when there's no direct converter.
 - **Pluggable by design.** Drop a file in `morph/converters/`, call `register()`,
   and it's live — no central registry to edit.
 - **Local-first.** Nothing leaves your machine. No accounts, no upload, no API keys.
+- **Transparent Remote Downloads.** Pass any `http://` link ending in a file extension (e.g., `morph https://domain.com/data.csv out.json`) and morph will stream it to a local temp file, render a live progress bar, convert it, and clean it up automatically.
 - **Global Configuration (`~/.morphrc`).** Generate a fully-commented YAML configuration file containing every single flag for every converter using `morph config`. CLI arguments seamlessly override these base defaults, giving you maximum control.
 
 ## Installation
@@ -102,6 +103,10 @@ morph diagram.svg diagram.png
 # Fonts (fontTools)
 morph font.ttf font.woff2
 morph font.woff font.otf
+
+# Remote Network Files
+morph https://example.com/demo.mp4 demo.gif  # streams to a temp file, converts, and cleans up
+morph https://example.com/article.html doc.pdf --js  # scrapes via crawl4ai if no format is detected
 
 # Ebooks (Calibre)
 morph book.epub book.mobi
