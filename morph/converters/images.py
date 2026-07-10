@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Optional
 
 from PIL import Image
+import pillow_heif
+import pillow_avif
+
+pillow_heif.register_heif_opener()
 
 from ..registry import ConversionResult, OptionSpec, register
 
@@ -19,13 +23,14 @@ from ..registry import ConversionResult, OptionSpec, register
 FORMATS: dict[str, str] = {
     "png": "PNG", "jpg": "JPEG", "jpeg": "JPEG", "webp": "WEBP",
     "bmp": "BMP", "gif": "GIF", "tiff": "TIFF", "ico": "ICO",
+    "heic": "HEIF", "avif": "AVIF", "pdf": "PDF", "icns": "ICNS",
 }
 
 # formats whose writer supports a quality setting
-_QUALITY_FORMATS = {"JPEG", "WEBP"}
+_QUALITY_FORMATS = {"JPEG", "WEBP", "HEIF", "AVIF"}
 
 # formats that can't store an alpha channel — need RGB flattening first
-_NO_ALPHA_FORMATS = {"JPEG", "BMP"}
+_NO_ALPHA_FORMATS = {"JPEG", "BMP", "PDF"}
 
 
 def _parse_resize(spec: str, size: tuple[int, int]) -> tuple[int, int]:

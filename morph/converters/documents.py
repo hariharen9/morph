@@ -31,6 +31,12 @@ FORMATS: dict[str, dict] = {
     "rst":    {"read": "rst",       "write": "rst",      "ext": "rst"},
     "txt":    {"read": "markdown",  "write": "plain",    "ext": "txt"},
     "pdf":    {"read": None,        "write": "pdf",      "ext": "pdf"},
+    "ipynb":  {"read": "ipynb",     "write": "ipynb",    "ext": "ipynb"},
+    "pptx":   {"read": "pptx",      "write": "pptx",     "ext": "pptx"},
+    "adoc":   {"read": "asciidoc",  "write": "asciidoc", "ext": "adoc"},
+    "org":    {"read": "org",       "write": "org",      "ext": "org"},
+    "opml":   {"read": "opml",      "write": "opml",     "ext": "opml"},
+    "man":    {"read": "man",       "write": "man",      "ext": "man"},
 }
 
 # tried in order; first one found on PATH is used

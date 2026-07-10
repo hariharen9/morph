@@ -40,7 +40,7 @@ intermediate formats automatically when there's no direct converter.
 
 - **One verb.** `morph <input> <output>` — not `morph convert`. morph *is* the verb.
 - **Smart multi-hop routing.** No direct `csv → yaml` converter? morph finds
-  `csv → json → yaml` on its own, and tells you it did.
+  `csv → json → yaml` on its own. By utilizing a Breadth-First Search (BFS) directed graph, morph instantly unlocks thousands of implicit conversions. Currently supporting **66 formats and over 1,000+ multi-hop routes** across data, documents, images, audio, and video!
 - **Full control, contextually.** `morph data.csv data.xlsx --help` shows exactly
   the flags relevant to *that* pair — table styles, freeze panes, passwords —
   and nothing from unrelated converters.
@@ -248,13 +248,13 @@ $ morph formats mp4
 
 | Domain | Formats | Backend |
 |---|---|---|
-| **Data** | csv, xlsx, json, yaml | native (pandas / openpyxl) |
-| **Documents** | md, html, docx, odt, rtf, epub, latex, rst, txt, pdf* | pandoc |
-| **Images** | png, jpg/jpeg, webp, bmp, gif, tiff, ico, svg (input only) | Pillow / cairosvg |
+| **Data** | csv, xlsx, json, yaml, parquet, feather, ods, xml, html, sqlite | native (pandas / openpyxl) |
+| **Documents** | md, html, docx, odt, rtf, epub, latex, rst, txt, ipynb, pptx, adoc, org, opml, man, pdf* | pandoc |
+| **Images** | png, jpg/jpeg, webp, bmp, gif, tiff, ico, heic, avif, icns, pdf, svg (input only) | Pillow / cairosvg |
 | **Fonts** | ttf, otf, woff, woff2 | fontTools |
 | **Ebooks** | epub, mobi, azw3 | Calibre (`ebook-convert`) |
-| **Audio** | mp3, wav, flac, ogg, aac, m4a | ffmpeg |
-| **Video** | mp4, mkv, mov, webm, avi (+ → audio, + → gif) | ffmpeg |
+| **Audio** | mp3, wav, flac, ogg, aac, m4a, opus, wma | ffmpeg |
+| **Video** | mp4, mkv, mov, webm, avi, flv, wmv, mpeg (+ → audio, + → gif/webp, + → srt/vtt) | ffmpeg |
 | **Archives** | zip, tar, tar.gz, tar.bz2, tar.xz | stdlib |
 
 <sub>*pdf is output-only — morph doesn't read PDFs back into structured content,

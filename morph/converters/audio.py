@@ -17,7 +17,7 @@ from typing import Optional
 from ..ffmpeg_utils import ProgressCallback, run_ffmpeg
 from ..registry import ConversionResult, OptionSpec, register
 
-FORMATS = ["mp3", "wav", "flac", "ogg", "aac", "m4a"]
+FORMATS = ["mp3", "wav", "flac", "ogg", "aac", "m4a", "opus", "wma"]
 
 OPTIONS = [
     OptionSpec("bitrate", ("-b", "--bitrate"), "Audio bitrate, e.g. '192k'. Default: ffmpeg's per-codec default."),

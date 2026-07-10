@@ -17,7 +17,7 @@ from ..ffmpeg_utils import ProgressCallback, run_ffmpeg
 from ..registry import ConversionResult, OptionSpec, register
 from .audio import FORMATS as AUDIO_FORMATS
 
-FORMATS = ["mp4", "mkv", "mov", "webm", "avi"]
+FORMATS = ["mp4", "mkv", "mov", "webm", "avi", "flv", "wmv", "mpeg"]
 
 _COMMON_OPTIONS = [
     OptionSpec("resolution", ("--resolution",), "Output resolution, e.g. '1280x720'. Default: keep source size."),
@@ -95,7 +95,7 @@ _GIF_OPTIONS = [
 ]
 
 
-def _to_gif(input_path: Path, output_path: Path, *, fps: int = 10, width: int = 480,
+def _to_animated(input_path: Path, output_path: Path, *, fps: int = 10, width: int = 480,
             start: Optional[str] = None, duration: Optional[str] = None,
             _progress: Optional[ProgressCallback] = None, **_options) -> ConversionResult:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -130,9 +130,24 @@ for _src in FORMATS:
             options=_EXTRACT_AUDIO_OPTIONS, supports_progress=True,
         )(_extract_audio)
 
-# video -> gif
+# video -> gif / webp
 for _src in FORMATS:
-    register(
-        _src, "gif", backend="ffmpeg", requires_binary="ffmpeg", family="video",
-        description=f"{_src} → gif", lossy=True, options=_GIF_OPTIONS, supports_progress=True,
-    )(_to_gif)
+    for _dst in ("gif", "webp"):
+        register(
+            _src, _dst, backend="ffmpeg", requires_binary="ffmpeg", family="video",
+            description=f"{_src} → {_dst}", lossy=True, options=_GIF_OPTIONS, supports_progress=True,
+        )(_to_animated)
+
+# video -> subtitles
+def _extract_subs(input_path: Path, output_path: Path, **_options) -> ConversionResult:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(input_path), "-map", "0:s:0", str(output_path)]
+    run_ffmpeg(cmd, input_path=input_path)
+    return ConversionResult(output=output_path)
+
+for _src in FORMATS:
+    for _dst in ("srt", "vtt"):
+        register(
+            _src, _dst, backend="ffmpeg", requires_binary="ffmpeg", family="video",
+            description=f"{_src} → {_dst} (extract subtitles)", lossy=True,
+        )(_extract_subs)
