@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "morph"
+name = "morphcli"
 version = "1.0.0"
 description = "morph — convert anything to anything, from the CLI"
 readme = "README.md"

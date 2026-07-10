@@ -86,17 +86,31 @@ class MorphGroup(TyperGroup):
         # We explicitly allow "config" alongside whatever is in self.commands
         # just in case Typer hasn't fully populated the commands dict yet.
         known_commands = list(self.commands.keys()) + ["config", "init"]
-        if args and args[0] not in known_commands:
+        if args and args[0] not in known_commands and not args[0].startswith("-"):
             args = ["run", *args]
         return super().resolve_command(ctx, args)
+        
+    def parse_args(self, ctx, args):
+        if "--version" in args or "-v" in args:
+            import importlib.metadata
+            from rich import print
+            try:
+                version = importlib.metadata.version("morphcli")
+            except importlib.metadata.PackageNotFoundError:
+                version = "unknown"
+            print(f"[bold cyan]morph[/bold cyan] version [green]{version}[/green]")
+            import sys
+            sys.exit(0)
+        return super().parse_args(ctx, args)
 
 
 app = typer.Typer(
     name="morph",
     cls=MorphGroup,
-    help="[bold cyan]morph[/bold cyan] — convert anything to anything, from the CLI.",
+    help="[bold cyan]morph[/bold cyan] — convert anything to anything, from the CLI.\n\n[bold]Global Options:[/bold]\n  [cyan]-v, --version[/cyan]        Show the application's version and exit.",
     rich_markup_mode="rich",
     invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
     pretty_exceptions_show_locals=False,
 )
 
