@@ -243,6 +243,9 @@ def run_cmd(
     quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress banners and tables."),
 ) -> None:
     from . import history as hist
+    
+    if not quiet:
+        console.print("\n[bold cyan]⚡ MORPH[/bold cyan] [dim]— Convert anything to anything.[/dim]\n")
 
     src, dst = _fmt_of(input_file), _fmt_of(output_file)
     path = registry.find_path(src, dst)
@@ -368,7 +371,8 @@ def run_cmd(
         if result.pages is not None:
             extras.append(f"{result.pages} pages")
         extra_str = f"  ({', '.join(extras)})" if extras else ""
-        console.print(f"[success]✓ Done![/success]  → [accent]{output_file}[/accent]{extra_str}\n")
+        console.print(f"[success]✓ Done![/success]  → [accent]{output_file}[/accent]{extra_str}")
+        console.print("\n[dim]Built with 💖 by [link=https://hariharen.site]Hariharen[/link][/dim]\n")
 
 
 # ── batch ─────────────────────────────────────────────────────────────────────
@@ -395,6 +399,9 @@ def batch_cmd(
     quiet: bool = typer.Option(False, "-q", "--quiet", help="No live display — just print summary."),
 ) -> None:
     from .batch import collect_inputs, run_batch
+
+    if not quiet:
+        console.print("\n[bold cyan]⚡ MORPH[/bold cyan] [dim]— Convert anything to anything.[/dim]\n")
 
     if len(inputs) < 2:
         err_console.print("[error]✗ Provide at least one input pattern and a target format.[/error]")
@@ -472,6 +479,7 @@ def batch_cmd(
         quiet=quiet,
     )
 
+    console.print("\n[dim]Built with 💖 by [link=https://hariharen.site]Hariharen[/link][/dim]\n")
     raise typer.Exit(0 if result.failed == 0 else 1)
 
 
