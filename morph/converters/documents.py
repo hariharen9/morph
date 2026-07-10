@@ -64,7 +64,112 @@ def _run_pandoc(input_path: Path, output_path: Path, *, src_fmt: str, dst_fmt: s
     if extra_args:
         cmd += extra_args
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    return subprocess.run(cmd, capture_output=True, text=True)
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def _preprocess_svgs(input_path: Path, tmpdir: Path, src: str) -> Path:
+    if src not in ("md", "html", "txt"):
+        return input_path
+
+    try:
+        content = input_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return input_path
+
+    import re
+    import hashlib
+    import urllib.request
+
+    try:
+        import cairosvg
+        # Trigger DLL loading immediately to verify if C libraries are functional
+        cairosvg.svg2pdf(bytestring=b"<svg></svg>")
+        has_cairo = True
+    except Exception:
+        has_cairo = False
+
+    converted_cache: dict[str, Path] = {}
+    modified = False
+
+    def get_converted_pdf(img_src: str) -> Optional[str]:
+        if not has_cairo:
+            return None
+
+        if img_src in converted_cache:
+            return converted_cache[img_src].as_posix()
+
+        # Generate a stable filename based on the hash of the image source
+        src_hash = hashlib.md5(img_src.encode("utf-8")).hexdigest()
+        pdf_path = tmpdir / f"svg_img_{src_hash}.pdf"
+
+        try:
+            is_url = img_src.startswith(("http://", "https://"))
+            if is_url:
+                req = urllib.request.Request(
+                    img_src,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Antigravity/1.0'}
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    svg_bytes = response.read()
+                cairosvg.svg2pdf(bytestring=svg_bytes, write_to=str(pdf_path))
+            else:
+                # Local file: resolve relative to input_path's parent directory
+                local_path = (input_path.parent / img_src).resolve()
+                if not local_path.exists():
+                    # Try directly as absolute or relative path
+                    local_path = Path(img_src).resolve()
+                if local_path.exists():
+                    cairosvg.svg2pdf(url=str(local_path), write_to=str(pdf_path))
+                else:
+                    return None
+
+            if pdf_path.exists() and pdf_path.stat().st_size > 0:
+                converted_cache[img_src] = pdf_path
+                return pdf_path.as_posix()
+        except Exception:
+            pass
+
+        return None
+
+    # Replace markdown images: ![alt](img.svg)
+    def md_repl(match):
+        nonlocal modified
+        prefix, img_src, suffix = match.groups()
+        pdf_url = get_converted_pdf(img_src)
+        if pdf_url:
+            modified = True
+            return f"{prefix}{pdf_url}{suffix}"
+        else:
+            # Convert image inclusion to a standard hyperlink to avoid LaTeX error
+            modified = True
+            # prefix is like '![alt]('
+            link_prefix = prefix.lstrip("!")
+            return f"{link_prefix}{img_src}{suffix}"
+
+    md_pattern = re.compile(r'(!\[.*?\]\()([^)]*?\.svg(?:[?#][^)]*)?)(\))', re.IGNORECASE)
+    content = md_pattern.sub(md_repl, content)
+
+    # Replace HTML images: <img src="img.svg" ...>
+    def html_repl(match):
+        nonlocal modified
+        prefix, img_src, suffix = match.groups()
+        pdf_url = get_converted_pdf(img_src)
+        if pdf_url:
+            modified = True
+            return f"{prefix}{pdf_url}{suffix}"
+        else:
+            modified = True
+            return f'<a href="{img_src}">[SVG Image]</a>'
+
+    html_pattern = re.compile(r'(<img\s+[^>]*src=["\'])([^"\']+\.svg(?:[?#][^"\']*)?)(["\'])', re.IGNORECASE)
+    content = html_pattern.sub(html_repl, content)
+
+    if modified:
+        temp_input = tmpdir / f"preprocessed_{input_path.name}"
+        temp_input.write_text(content, encoding="utf-8")
+        return temp_input
+
+    return input_path
 
 
 def _pandoc_convert(input_path: Path, output_path: Path, *, src: str, dst: str,
@@ -92,13 +197,16 @@ def _pandoc_convert(input_path: Path, output_path: Path, *, src: str, dst: str,
         )
 
     errors: list[str] = []
-    for engine in candidates:
-        result = _run_pandoc(input_path, output_path, src_fmt=src_fmt, dst_fmt=dst_fmt,
-                              dst=dst, engine=engine, extra_args=extra_args)
-        if result.returncode == 0:
-            return ConversionResult(output=output_path, pages=_count_pdf_pages(output_path),
-                                     extra={"pdf_engine": engine})
-        errors.append(f"  {engine}: {result.stderr.strip().splitlines()[-1] if result.stderr.strip() else 'failed'}")
+    import tempfile
+    with tempfile.TemporaryDirectory() as pdftmp:
+        preprocessed_input = _preprocess_svgs(input_path, Path(pdftmp), src)
+        for engine in candidates:
+            result = _run_pandoc(preprocessed_input, output_path, src_fmt=src_fmt, dst_fmt=dst_fmt,
+                                  dst=dst, engine=engine, extra_args=extra_args)
+            if result.returncode == 0:
+                return ConversionResult(output=output_path, pages=_count_pdf_pages(output_path),
+                                         extra={"pdf_engine": engine})
+            errors.append(f"  {engine}: {result.stderr.strip().splitlines()[-1] if result.stderr.strip() else 'failed'}")
 
     raise RuntimeError(
         f"All available PDF engines failed ({', '.join(candidates)}):\n" + "\n".join(errors)

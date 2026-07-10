@@ -98,3 +98,31 @@ def test_pandoc_fallback_mocked(dummy_files, mocker):
     first_call_cmd = mock_run.call_args_list[0][0][0]
     assert "--pdf-engine" in first_call_cmd
     assert "xelatex" in first_call_cmd
+
+
+def test_preprocess_svgs_fallback(dummy_files):
+    from morph.converters.documents import _preprocess_svgs
+    
+    # Create a dummy markdown file referencing an SVG image
+    md_content = "# Test\n![License](https://img.shields.io/badge/License-MIT-yellow.svg)\nSome text <img src=\"local.svg\" class=\"img\">"
+    md_file = dummy_files["dir"] / "test_svg.md"
+    md_file.write_text(md_content, encoding="utf-8")
+    
+    # We pass in a temporary directory for outputs
+    tmp_out = dummy_files["dir"] / "tmp_preprocess"
+    tmp_out.mkdir(exist_ok=True)
+    
+    # Process the file
+    res_path = _preprocess_svgs(md_file, tmp_out, "md")
+    
+    # It should return a new preprocessed path
+    assert res_path != md_file
+    assert res_path.exists()
+    
+    new_content = res_path.read_text(encoding="utf-8")
+    # Verify that the image was converted to a standard hyperlink/anchor
+    assert "![License]" not in new_content
+    assert "[License](https://img.shields.io/badge/License-MIT-yellow.svg)" in new_content
+    assert "<img" not in new_content
+    assert '<a href="local.svg">[SVG Image]</a>' in new_content
+
