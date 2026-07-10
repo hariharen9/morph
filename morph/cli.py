@@ -97,11 +97,16 @@ app = typer.Typer(
 )
 
 
-def _fmt_of(path: Path) -> str:
+def _fmt_of(path: str | Path) -> str:
+    path_str = str(path).lower()
+    if path_str.startswith("http://") or path_str.startswith("https://"):
+        return "url"
+    if isinstance(path, str):
+        path = Path(path)
     return detect_format(path)
 
 
-def _print_route_help(input_file: Path, output_file: Path, path) -> None:
+def _print_route_help(input_file: str | Path, output_file: Path, path) -> None:
     src, dst = _fmt_of(input_file), _fmt_of(output_file)
     hop_str = " → ".join([src] + [s.dst for s in path])
     console.print(Panel.fit(f"[bold]{hop_str}[/bold]", title="morph — conversion route", border_style="cyan"))
@@ -144,7 +149,7 @@ def _build_parser(options) -> argparse.ArgumentParser:
 @app.command("run", hidden=True, context_settings={"ignore_unknown_options": True, "allow_extra_args": True, "help_option_names": []})
 def run_cmd(
     ctx: typer.Context,
-    input_file: Path = typer.Argument(..., help="Source file."),
+    input_file: str = typer.Argument(..., help="Source file or URL (http/https)."),
     output_file: Path = typer.Argument(..., help="Destination file (extension picks the target format)."),
     yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm dependency installs."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show the conversion plan without running it."),
@@ -173,14 +178,18 @@ def run_cmd(
         err_console.print(f"[warning]⚠ Ignoring unrecognized option(s):[/warning] {' '.join(unknown)}")
     options_dict = vars(parsed)
 
-    if not input_file.exists():
+    is_url = src == "url"
+    input_path = input_file if is_url else Path(input_file)
+
+    if not is_url and not input_path.exists():
         err_console.print(f"[error]✗ File not found:[/error] {input_file}")
         raise typer.Exit(1)
 
     hop_str = " → ".join([src] + [s.dst for s in path])
+    display_name = input_file if is_url else input_path.name
     if not quiet:
         console.print(Panel.fit(
-            f"[bold]{input_file.name}[/bold] → [bold]{output_file.name}[/bold]\n"
+            f"[bold]{display_name}[/bold] → [bold]{output_file.name}[/bold]\n"
             f"[muted]route:[/muted] {hop_str}"
             + ("  [warning](lossy step involved)[/warning]" if any(s.lossy for s in path) else ""),
             title="morph", border_style="cyan",
@@ -197,7 +206,7 @@ def run_cmd(
         err_console.print("[error]✗ Required dependency not available — aborting.[/error]")
         raise typer.Exit(1)
 
-    current_input = input_file
+    current_input = input_path
     result = None
     t_start = time.perf_counter()
     success = False
@@ -220,7 +229,7 @@ def run_cmd(
         elapsed = time.perf_counter() - t_start
         backends = ", ".join(dict.fromkeys(s.backend for s in path))
         entry = hist.make_entry(
-            input_file, src, output_file, dst,
+            input_path, src, output_file, dst,
             hop_str, backends, success, elapsed,
             error=error_msg,
         )
