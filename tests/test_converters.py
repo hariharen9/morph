@@ -126,3 +126,33 @@ def test_preprocess_svgs_fallback(dummy_files):
     assert "<img" not in new_content
     assert '<a href="local.svg">[SVG Image]</a>' in new_content
 
+
+def test_vtracer_vectorization(dummy_files):
+    from morph.converters.vtracer_converter import _image_to_svg
+    from PIL import Image
+    import os
+    
+    png_file = Path("vector_test_tmp.png")
+    svg_out = Path("out_tmp.svg")
+    
+    try:
+        # Create a 100x100 dummy image
+        img = Image.new("RGB", (100, 100), color="blue")
+        img.save(png_file)
+        
+        result = _image_to_svg(png_file, svg_out)
+        
+        assert result.output.exists()
+        assert result.output.stat().st_size > 0
+        
+        content = result.output.read_text(encoding="utf-8")
+        assert "<svg" in content or "<SVG" in content
+    finally:
+        if png_file.exists():
+            os.remove(png_file)
+        if svg_out.exists():
+            os.remove(svg_out)
+
+
+
+
