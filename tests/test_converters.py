@@ -154,5 +154,44 @@ def test_vtracer_vectorization(dummy_files):
             os.remove(svg_out)
 
 
+CUBE_OBJ = """
+v -1.0 -1.0 -1.0
+v 1.0 -1.0 -1.0
+v 1.0 1.0 -1.0
+v -1.0 1.0 -1.0
+v -1.0 -1.0 1.0
+v 1.0 -1.0 1.0
+v 1.0 1.0 1.0
+v -1.0 1.0 1.0
+f 1 2 3 4
+f 5 8 7 6
+f 1 5 6 2
+f 2 6 7 3
+f 3 7 8 4
+f 5 1 4 8
+"""
+
+def test_models_3d_conversion(dummy_files):
+    from morph.converters.models_3d import _3d_to_3d
+    
+    obj_in = dummy_files["dir"] / "cube.obj"
+    obj_in.write_text(CUBE_OBJ, encoding="utf-8")
+    glb_out = dummy_files["dir"] / "cube.glb"
+    
+    result = _3d_to_3d(obj_in, glb_out)
+    
+    assert result.output.exists()
+    assert result.output.stat().st_size > 0
 
 
+def test_models_3d_to_image(dummy_files):
+    from morph.converters.models_3d import _3d_to_image
+    
+    obj_in = dummy_files["dir"] / "cube.obj"
+    obj_in.write_text(CUBE_OBJ, encoding="utf-8")
+    png_out = dummy_files["dir"] / "cube.png"
+    
+    result = _3d_to_image(obj_in, png_out)
+    
+    assert result.output.exists()
+    assert result.output.stat().st_size > 0
