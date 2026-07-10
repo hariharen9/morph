@@ -163,6 +163,19 @@ class Registry:
                 combined.append(opt)
         return combined
 
+    def all_options(self) -> dict[str, list[OptionSpec]]:
+        """All options across the entire registry, grouped by family."""
+        families: dict[str, list[OptionSpec]] = {}
+        seen_names: set[str] = set()
+        
+        for spec in self._edges.values():
+            for opt in spec.options:
+                if opt.name not in seen_names:
+                    seen_names.add(opt.name)
+                    families.setdefault(spec.family, []).append(opt)
+                    
+        return families
+
     def known_binaries(self) -> set[str]:
         return {spec.requires_binary for spec in self._edges.values() if spec.requires_binary}
 

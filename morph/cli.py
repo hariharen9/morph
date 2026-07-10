@@ -24,6 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import List, Optional
+import yaml
 
 # Ensure Unicode output works on Windows regardless of terminal encoding
 if hasattr(sys.stdout, "reconfigure"):
@@ -82,7 +83,10 @@ class MorphGroup(TyperGroup):
     forwarded to the hidden `run` command, which does the actual routing."""
 
     def resolve_command(self, ctx, args):
-        if args and args[0] not in self.commands:
+        # We explicitly allow "config" alongside whatever is in self.commands
+        # just in case Typer hasn't fully populated the commands dict yet.
+        known_commands = list(self.commands.keys()) + ["config", "init"]
+        if args and args[0] not in known_commands:
             args = ["run", *args]
         return super().resolve_command(ctx, args)
 
@@ -144,6 +148,83 @@ def _build_parser(options) -> argparse.ArgumentParser:
     return parser
 
 
+def get_config_path() -> Path:
+    return Path.home() / ".morphrc"
+
+def load_config() -> dict:
+    config_path = get_config_path()
+    if not config_path.exists():
+        return {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            if not isinstance(data, dict):
+                return {}
+            
+            flat_config = {}
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    flat_config.update(v)
+                else:
+                    flat_config[k] = v
+            return flat_config
+    except Exception as e:
+        err_console.print(f"[warning]⚠ Failed to load {config_path}: {e}[/warning]")
+        return {}
+
+
+@app.command("config")
+def init_config():
+    """Generate a fully populated ~/.morphrc with best default values."""
+    config_path = get_config_path()
+    if config_path.exists():
+        console.print(f"[warning]⚠ {config_path} already exists. Overwriting is not supported.[/warning]")
+        raise typer.Exit(1)
+        
+    options_by_family = registry.all_options()
+    
+    yaml_lines = [
+        "# Morph Configuration File",
+        "# ------------------------",
+        "# This file provides default options for all conversions.",
+        "# Command line flags will always override these settings.",
+        ""
+    ]
+    
+    yaml_lines.extend([
+        "global:",
+        "  # Use headless browser to render JavaScript on URLs.",
+        "  # js: false",
+        "  # Auto-confirm dependency installs.",
+        "  # yes: false",
+        ""
+    ])
+    
+    for family, options in sorted(options_by_family.items()):
+        if not options:
+            continue
+        yaml_lines.append(f"{family}:")
+        for opt in sorted(options, key=lambda x: x.name):
+            if opt.help:
+                yaml_lines.append(f"  # {opt.help}")
+            
+            default_val = opt.default
+            if default_val is None:
+                yaml_val = "null"
+            elif isinstance(default_val, bool):
+                yaml_val = str(default_val).lower()
+            elif isinstance(default_val, str):
+                yaml_val = repr(default_val)
+            else:
+                yaml_val = str(default_val)
+                
+            yaml_lines.append(f"  # {opt.name}: {yaml_val}")
+        yaml_lines.append("")
+        
+    config_path.write_text("\\n".join(yaml_lines), encoding="utf-8")
+    console.print(f"[success]✓ Generated full configuration file at {config_path}[/success]")
+
+
 # ── run (hidden, handles direct file→file conversion) ────────────────────────
 
 @app.command("run", hidden=True, context_settings={"ignore_unknown_options": True, "allow_extra_args": True, "help_option_names": []})
@@ -174,6 +255,10 @@ def run_cmd(
 
     combined_opts = registry.combined_options(path)
     parser = _build_parser(combined_opts)
+    
+    # Merge ~/.morphrc values as defaults before parsing CLI arguments
+    parser.set_defaults(**load_config())
+    
     parsed, unknown = parser.parse_known_args(ctx.args)
     if unknown:
         err_console.print(f"[warning]⚠ Ignoring unrecognized option(s):[/warning] {' '.join(unknown)}")

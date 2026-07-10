@@ -60,6 +60,7 @@ intermediate formats automatically when there's no direct converter.
 - **Pluggable by design.** Drop a file in `morph/converters/`, call `register()`,
   and it's live — no central registry to edit.
 - **Local-first.** Nothing leaves your machine. No accounts, no upload, no API keys.
+- **Global Configuration (`~/.morphrc`).** Generate a fully-commented YAML configuration file containing every single flag for every converter using `morph config`. CLI arguments seamlessly override these base defaults, giving you maximum control.
 
 ## Installation
 
