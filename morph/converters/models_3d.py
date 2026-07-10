@@ -11,6 +11,10 @@ from ..registry import ConversionResult, register
 
 def _run_bpy_script(script_content: str) -> None:
     """Run a bpy script in an isolated subprocess to prevent global state corruption/memory leaks."""
+    import importlib.util
+    if importlib.util.find_spec("bpy") is None:
+        raise RuntimeError(f"3D conversion requires the 'bpy' package (not available on Python {sys.version_info.major}.{sys.version_info.minor}). Please use Python 3.13 or older, or install Blender.")
+
     code = f"""
 import bpy
 import sys
