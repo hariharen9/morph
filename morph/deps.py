@@ -81,6 +81,7 @@ _WHY = {
     "pysubs2": "converts subtitle formats (srt, vtt, ass, ssa, sub, sami) with timing and style preserved",
     "tomlkit": "reads and writes TOML files, preserving comments and key ordering",
     "nbconvert": "exports Jupyter notebooks to HTML, PDF, Python, Markdown and more (with real cell outputs)",
+    "img2pdf": "embeds images into PDF without transcoding — lossless, smaller files than Pillow's PDF writer",
 }
 
 

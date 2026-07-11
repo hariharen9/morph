@@ -119,3 +119,72 @@ for _src in FORMATS:
             lossy=(_dst_pil in _QUALITY_FORMATS or _dst == "ico"),
             options=_OPTIONS_BY_DST.get(_dst, _DEFAULT_OPTIONS),
         )(_make_converter(_dst_pil))
+
+
+# ── img2pdf: lossless image → PDF (overwrites Pillow's re-encoding routes) ──
+#
+# Pillow's PDF writer transcodes — a JPEG saved to PDF becomes a re-encoded
+# JPEG, losing quality. img2pdf embeds the original image bytes directly,
+# producing smaller files with zero quality loss. Supported source types:
+#   JPEG/JPG  — embedded as-is (best case)
+#   PNG       — embedded as-is if no alpha; RGB-flattened then embedded
+#   TIFF      — embedded as-is
+#   WEBP/BMP/GIF/etc. — converted to PNG internally by img2pdf, then embedded
+#
+# img2pdf does NOT support alpha channels, so we pre-flatten RGBA sources.
+
+def _require_img2pdf():
+    try:
+        import img2pdf
+        return img2pdf
+    except ImportError:
+        raise RuntimeError(
+            "img2pdf is required for lossless image-to-PDF conversion.\n"
+            "Install it with: pip install img2pdf"
+        )
+
+
+def _img_to_pdf(input_path: Path, output_path: Path, **_options) -> ConversionResult:
+    """Embed image bytes directly into PDF without transcoding."""
+    img2pdf = _require_img2pdf()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Check for alpha channel — img2pdf requires opaque images
+    with Image.open(input_path) as img:
+        has_alpha = img.mode in ("RGBA", "LA", "P") and "transparency" in img.info or img.mode in ("RGBA", "LA")
+
+    if has_alpha:
+        # Flatten alpha onto white background, save to temp PNG, then embed
+        import tempfile
+        with Image.open(input_path) as img:
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode in ("RGBA", "LA"):
+                background.paste(img, mask=img.split()[-1])
+            else:
+                background.paste(img.convert("RGBA"), mask=img.convert("RGBA").split()[-1])
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+                background.save(tmp_path, format="PNG")
+        try:
+            pdf_bytes = img2pdf.convert(str(tmp_path))
+        finally:
+            tmp_path.unlink(missing_ok=True)
+    else:
+        pdf_bytes = img2pdf.convert(str(input_path))
+
+    output_path.write_bytes(pdf_bytes)
+    return ConversionResult(output=output_path)
+
+
+# Formats img2pdf handles (all raster sources except pdf itself)
+_IMG2PDF_SRCS = [s for s in FORMATS if s != "pdf"]
+
+for _src in _IMG2PDF_SRCS:
+    register(
+        _src, "pdf",
+        backend="img2pdf",
+        family="image",
+        description=f"{_src} -> pdf (lossless, img2pdf)",
+        lossy=False,  # img2pdf embeds original bytes — truly lossless
+    )(_img_to_pdf)
