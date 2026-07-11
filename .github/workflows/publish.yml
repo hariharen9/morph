@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Publish to PyPI and Winget
 
 on:
   push:
@@ -30,3 +30,44 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+  build-windows-exe:
+    name: Build Windows Executable
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies and PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Build Executable
+        run: |
+          pyinstaller --name morph --onefile morph/cli.py
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/morph.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  winget-publish:
+    name: Publish to Winget
+    needs: build-windows-exe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit to Winget
+        uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: hariharen.morph
+          installers-regex: '\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
