@@ -125,6 +125,13 @@ Raster conversions, plus advanced raster-to-vector tracing.
 morph photo.png photo.webp --quality 80 --resize 1200x
 morph icon.png icon.ico
 
+# Camera RAW (cr2, nef, arw, dng...) -> jpg/png via LibRaw
+morph photo.CR2 photo.jpg --half-size
+
+# QR Codes & Barcodes
+echo "https://mysite.com" > url.txt && morph url.txt qr.png
+morph qr.png decoded.txt
+
 # Raster to Vector (via vtracer)
 morph logo.png logo.svg --mode spline --hierarchical stacked
 ```
@@ -211,11 +218,13 @@ During batch conversions, `morph` displays a live status table:
 | **Documents** | `md`, `html`, `docx`, `odt`, `rtf`, `epub`, `latex`, `rst`, `txt`, `pptx`, `adoc`, `org`, `opml`, `man` | `pandoc` |
 | **Legacy Office** | `doc`, `xls`, `ppt` | `LibreOffice (soffice)` |
 | **Notebooks** | `ipynb` | `nbconvert` (executes & renders outputs) |
-| **PDF** | `pdf` (real text, layout, tables, generation) | `pymupdf` / `pdfplumber` / `pdf2docx` |
+| **PDF** | `pdf` (layout, tables, HTML+CSS, images) | `pymupdf` / `weasyprint` / `img2pdf` / `pdf2docx` |
 | **Images (Raster)** | `png`, `jpg/jpeg`, `webp`, `bmp`, `gif`, `tiff`, `ico`, `heic`, `avif`, `icns` | `Pillow` / `cairosvg` |
+| **Camera RAW** | `cr2`, `nef`, `arw`, `dng`, `raf`, `orf`, `rw2`, etc. | `rawpy` (LibRaw) |
+| **QR / Barcodes** | `txt/url` → `png/jpg` (gen), `img` → `txt` (decode) | `qrcode` / `pyzbar` |
 | **Vectorization** | `png`/`jpg`/etc. → `svg` | `vtracer` |
 | **3D Models** | `obj`, `stl`, `fbx`, `gltf`, `glb`, `blend`, `any → png` (Render) | `bpy` (Blender) |
-| **Web Extraction** | `url` → `md`, `txt`, `xml`, `html` | `trafilatura` / `crawl4ai` |
+| **Web Extraction** | `url` → `md`, `txt`, `xml`, `html` | `trafilatura` / `markdownify` / `crawl4ai` |
 | **Audio** | `mp3`, `wav`, `flac`, `ogg`, `aac`, `m4a`, `opus`, `wma` | `ffmpeg` |
 | **Video** | `mp4`, `mkv`, `mov`, `webm`, `avi`, `flv`, `wmv`, `mpeg` | `ffmpeg` |
 | **Subtitles** | `srt`, `vtt`, `ass`, `ssa`, `sub`, `sami` | `pysubs2` |
