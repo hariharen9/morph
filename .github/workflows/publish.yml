@@ -57,19 +57,22 @@ jobs:
           pip install nuitka
           
       - name: Build Executable
-        run: python -m nuitka --onefile --standalone --assume-yes-for-downloads -o morph morph/cli.py
+        run: python -m nuitka --onefile --standalone --assume-yes-for-downloads -o morph_out morph/cli.py
 
       - name: Package Unix Binary
         if: runner.os != 'Windows'
         run: |
           mkdir artifacts
-          tar -czvf artifacts/${{ matrix.artifact_name }} morph.bin || tar -czvf artifacts/${{ matrix.artifact_name }} morph
+          # Rename output binary (Nuitka adds .bin on Linux)
+          mv morph_out.bin morph 2>/dev/null || mv morph_out morph
+          tar -czvf artifacts/${{ matrix.artifact_name }} morph
           
       - name: Package Windows Binary
         if: runner.os == 'Windows'
         run: |
           mkdir artifacts
-          # For windows, we just move the exe so it can be uploaded directly
+          # Rename output binary and move to artifacts
+          mv morph_out.exe morph.exe
           mv morph.exe artifacts/${{ matrix.artifact_name }}
           
       - name: Upload Release Asset
