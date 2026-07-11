@@ -1,0 +1,9 @@
+PackageIdentifier: hariharen.morph
+PackageVersion: 1.0.0
+PackageLocale: en-US
+Publisher: Hariharen
+PackageName: morph
+License: MIT
+ShortDescription: The Universal File Converter for the Command Line.
+ManifestType: defaultLocale
+ManifestVersion: 1.5.0
