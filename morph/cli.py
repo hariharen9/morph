@@ -792,7 +792,7 @@ def main(
     download: Optional[str] = typer.Option(None, "-d", "--download", help="Download media from URL using yt-dlp."),
     audio: bool = typer.Option(False, "--audio", help="Download audio only."),
     quality: str = typer.Option("best", "--quality", help="Video resolution (e.g., '1080', '720') or 'best'."),
-    metadata: bool = typer.Option(True, "--no-metadata", help="Disable embedding metadata (thumbnail, tags, etc.).", is_flag=True),
+    metadata: bool = typer.Option(True, "--metadata/--no-metadata", help="Enable or disable embedding metadata (thumbnail, tags, etc.)."),
 ) -> None:
     if download:
         import yt_dlp

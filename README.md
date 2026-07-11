@@ -33,13 +33,15 @@ Whether you are rendering a 3D `.blend` file to a `.png`, scraping a Wikipedia a
 
 ## ✨ Features
 
-- **One Universal Verb.** `morph <input> <output>`. That's it. `morph` *is* the verb.
-- **Smart Multi-Hop Graph Routing.** No direct `csv → yaml` converter? `morph` automatically finds the `csv → json → yaml` route. Powered by a Breadth-First Search (BFS) graph, `morph` instantly unlocks thousands of implicit conversions. Currently supporting **over 70 formats and 1,000+ multi-hop routes**.
-- **Contextual Intelligence.** Run `morph data.csv data.xlsx --help` and you'll *only* see flags relevant to that specific pair (like `--table-style` or `--freeze-cols`). Run it on a video file, and you'll see bitrate and framerate controls instead. 
-- **Transparent Remote Downloads.** Pass any `http://` link and `morph` handles the rest. It can download a remote CSV directly into an Excel workbook, or scrape a web article straight into a clean Markdown document.
+- **One Universal Verb.** `morph <input> <output>`. That's it. Omit the output, and `morph` acts as a wizard, presenting you with an interactive menu of all possible destination formats.
+- **Undo.** Made a mistake? Convert a massive 1,000-file directory by accident? Just type `morph undo` and watch it instantly delete the generated files and revert your history.
+- **Smart Multi-Hop Graph Routing.** No direct `csv → yaml` converter? `morph` automatically finds the `csv → json → yaml` route. When crossing wild paradigms (e.g. Markdown → SQLite), `morph` explicitly hints its logic (like `extracts tabular data only`).
+- **Contextual Intelligence.** Run `morph data.csv data.xlsx --help` and you'll *only* see flags relevant to that specific pair (like `--table-style` or `--freeze-cols`). Run it on a video file, and you'll see bitrate and framerate controls instead.
+- **Output Verification.** Pass the `--verify` flag to calculate and display the exact SHA-256 checksum of the resulting file right alongside the success message.
+- **Transparent Remote Downloads.** Pass any `http://` link and `morph` handles the rest. It uses `trafilatura` to scrape web articles into clean Markdown, or `yt-dlp` to natively download high-quality media (`morph <url> --audio`).
 - **Batch Processing Engine.** `morph batch '*.mp4' mp3` converts files concurrently with a live progress table, smart skip logic (`--newer-only`, `--skip-existing`), and output structure mirroring.
 - **Interactive TUI.** Type `morph` with no arguments to launch a stunning, keyboard-driven Textual UI. Navigate your filesystem, preview conversion options, and watch live progress bars without touching your mouse.
-- **Automated Dependency Management.** Missing `ffmpeg` or `pandoc`? `morph` detects your OS and package manager (brew/apt/winget/etc.), shows you the exact install command, and asks before running it.
+- **Automated Dependency Management.** Missing `ffmpeg` or `pandoc`? `morph` detects your OS and package manager (brew/apt/winget/etc.), shows you the exact install command, and asks before running it. Massive dependencies (like 3D rendering engines) are cleanly isolated as optional extras!
 - **Pluggable Architecture.** Drop a Python script in `morph/converters/`, add a `@register` decorator, and it's instantly live in the routing graph.
 - **Local-First & Private.** No cloud uploads. No API keys. Everything runs on your machine.
 
@@ -53,7 +55,13 @@ cd morph
 pip install -e .
 ```
 
-`morph` relies on native Python libraries for data, 3D, web, and archives. For specialized domains (like video or documents), it utilizes external binaries (e.g., `ffmpeg`, `pandoc`). You don't need to install these upfront — `morph` will intelligently prompt you to install them the first time they are needed.
+`morph` relies on native Python libraries for data, web, and archives. For massive specialized packages, `morph` uses optional extras to keep your base installation blazing fast. If you need them, simply install them:
+```bash
+pip install -e ".[3d]"   # Installs bpy (Blender) for 3D conversions
+pip install -e ".[web]"  # Installs crawl4ai and playwright for heavy JS rendering
+```
+
+For domain-specific external binaries (e.g., `ffmpeg`, `pandoc`), you don't need to install these upfront — `morph` will intelligently prompt you to install them the first time they are needed.
 
 To see your current system dependencies at any time:
 ```bash
@@ -102,16 +110,22 @@ morph clip.mkv clip.mp3  # Extract audio
 ```
 
 ### 🌐 Web & Remote Files
-Fetch data directly from the internet and transform it locally in one step.
+Fetch data directly from the internet and transform it locally in one step. `morph` natively embeds `yt-dlp` to download almost any media from the web.
 
 ```bash
+# Natively download video from YouTube, Twitter, etc.
+morph https://youtube.com/watch?v=... video.mp4
+
+# Extract audio only from a remote video with metadata embedded
+morph https://youtube.com/watch?v=... audio.mp3 --audio
+
 # Scrape an article into clean Markdown (via trafilatura)
 morph https://en.wikipedia.org/wiki/Graph_theory graph_theory.md
 
 # Download a remote CSV and style it as an Excel workbook natively
 morph https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/latest/owid-covid-latest.csv covid.xlsx --table-style TableStyleMedium2
 
-# Scrape a JavaScript-heavy page (spins up crawl4ai & playwright automatically)
+# Scrape a JavaScript-heavy page (requires morphconv[web])
 morph https://example.com/dynamic-article doc.pdf --js
 ```
 
