@@ -73,6 +73,9 @@ _WHY = {
     "xelatex": "renders documents to PDF with full LaTeX/typography support",
     "ebook-convert": "converts ebook formats (epub, mobi, azw3) — ships as part of Calibre",
     "playwright": "installs a headless Chromium browser to render Javascript (for --js)",
+    "pymupdf": "extracts text, layout, and images from digital PDFs without OCR",
+    "pdfplumber": "extracts tables and structured data from PDFs",
+    "pdf2docx": "converts PDFs to DOCX with layout preserved",
 }
 
 
