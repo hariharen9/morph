@@ -79,6 +79,7 @@ _WHY = {
     "py7zr": "reads and writes 7-Zip (.7z) archives",
     "rarfile": "extracts RAR archives (creation requires a proprietary tool)",
     "pysubs2": "converts subtitle formats (srt, vtt, ass, ssa, sub, sami) with timing and style preserved",
+    "tomlkit": "reads and writes TOML files, preserving comments and key ordering",
 }
 
 
