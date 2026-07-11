@@ -693,7 +693,75 @@ def deps_cmd() -> None:
 # ── entry point ───────────────────────────────────────────────────────────────
 
 @app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
+def main(
+    ctx: typer.Context,
+    download: Optional[str] = typer.Option(None, "-d", "--download", help="Download media from URL using yt-dlp."),
+    audio: bool = typer.Option(False, "--audio", help="Download audio only."),
+    quality: str = typer.Option("best", "--quality", help="Video resolution (e.g., '1080', '720') or 'best'."),
+    metadata: bool = typer.Option(True, "--no-metadata", help="Disable embedding metadata (thumbnail, tags, etc.).", is_flag=True),
+) -> None:
+    if download:
+        import yt_dlp
+        from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
+        
+        console.print(f"\n[bold cyan]⚡ MORPH[/bold cyan] [dim]— Downloading Media[/dim]\n")
+        
+        with Progress(
+            TextColumn("[cyan]{task.description}"),
+            BarColumn(complete_style="green", finished_style="green"),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            console=console
+        ) as progress:
+            task_id = progress.add_task("Fetching metadata...", total=None)
+            
+            def my_hook(d):
+                if d['status'] == 'downloading':
+                    total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
+                    downloaded_bytes = d.get('downloaded_bytes', 0)
+                    if total_bytes and progress.tasks[task_id].total is None:
+                        progress.update(task_id, total=total_bytes)
+                    if total_bytes:
+                        progress.update(task_id, completed=downloaded_bytes)
+                    if 'filename' in d:
+                        name = Path(d['filename']).name
+                        if len(name) > 30: name = name[:27] + "..."
+                        progress.update(task_id, description=f"Downloading [bold]{name}[/bold]")
+                elif d['status'] == 'finished':
+                    progress.update(task_id, description="[green]Finished downloading![/green]", total=100, completed=100)
+                    
+            ydl_opts = {
+                'outtmpl': '%(title)s.%(ext)s',
+                'progress_hooks': [my_hook],
+                'quiet': True,
+                'no_warnings': True,
+                'postprocessors': []
+            }
+            
+            if audio:
+                ydl_opts['format'] = 'bestaudio/best'
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'best',
+                })
+            else:
+                if quality != "best":
+                    ydl_opts['format'] = f'bestvideo[height<={quality}]+bestaudio/best'
+                else:
+                    ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                    
+            if metadata:
+                ydl_opts['postprocessors'].append({'key': 'FFmpegMetadata', 'add_metadata': True})
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([download])
+            except Exception as e:
+                err_console.print(f"\n[error]✗ Download failed:[/error] {e}")
+                raise typer.Exit(1)
+                
+        console.print("\n[success]✓ Done![/success]")
+        raise typer.Exit(0)
+        
     if ctx.invoked_subcommand is None:
         from .tui import run_tui
         run_tui()
