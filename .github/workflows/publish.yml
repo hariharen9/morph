@@ -32,7 +32,7 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
   build-executables:
-    name: Build PyInstaller Executables
+    name: Build native Executables
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
