@@ -41,6 +41,7 @@ dependencies = [
     "rarfile>=4.1",
     "pysubs2>=1.6.0",
     "tomlkit>=0.12.0",
+    "nbconvert>=7.0.0",
 ]
 
 [project.scripts]

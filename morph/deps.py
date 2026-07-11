@@ -80,6 +80,7 @@ _WHY = {
     "rarfile": "extracts RAR archives (creation requires a proprietary tool)",
     "pysubs2": "converts subtitle formats (srt, vtt, ass, ssa, sub, sami) with timing and style preserved",
     "tomlkit": "reads and writes TOML files, preserving comments and key ordering",
+    "nbconvert": "exports Jupyter notebooks to HTML, PDF, Python, Markdown and more (with real cell outputs)",
 }
 
 
