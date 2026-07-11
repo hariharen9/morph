@@ -109,15 +109,21 @@ def is_installed(binary: str) -> bool:
 
 def check(binary: str) -> DependencyStatus:
     if binary == "playwright":
-        # Check if the chromium browser folder exists inside playwright's cache.
-        # But a simple proxy is to check if `playwright install chromium` needs to run.
-        # We'll just assume `playwright` is in PATH (installed via pip) and construct the install command.
-        # Since we can't easily detect if the browser is downloaded, we'll try to run the install command.
-        # Actually, let's just make sure the `playwright` CLI exists. 
-        # Wait, if we want to install chromium, we'll return false if we want it to run.
-        # Let's just return True if `playwright` exists, but actually we need the browsers.
-        # If `playwright` is checked, we just return the pip command.
-        return DependencyStatus(binary, is_installed("playwright"), "pip", "playwright install chromium")
+        installed = False
+        has_cli = is_installed("playwright")
+        
+        if has_cli:
+            try:
+                import os
+                from playwright.sync_api import sync_playwright
+                with sync_playwright() as p:
+                    if os.path.exists(p.chromium.executable_path):
+                        installed = True
+            except Exception:
+                pass
+                
+        cmd = "playwright install chromium" if has_cli else "pip install morphconv[web]"
+        return DependencyStatus(binary, installed, "pip", cmd)
 
     if is_installed(binary):
         return DependencyStatus(binary, True, None, None)

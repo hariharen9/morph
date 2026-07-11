@@ -240,7 +240,7 @@ def init_config():
             yaml_lines.append(f"  # {opt.name}: {yaml_val}")
         yaml_lines.append("")
         
-    config_path.write_text("\\n".join(yaml_lines), encoding="utf-8")
+    config_path.write_text("\n".join(yaml_lines), encoding="utf-8")
     console.print(f"[success]✓ Generated full configuration file at {config_path}[/success]")
 
 

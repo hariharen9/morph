@@ -33,7 +33,7 @@ def _fetch_dynamic(url: str, output_format: str) -> str:
     try:
         from crawl4ai import AsyncWebCrawler
     except ImportError:
-        raise RuntimeError("crawl4ai is required for --js, but it's not installed.")
+        raise RuntimeError("crawl4ai is required for --js, but it's not installed. Run: pip install morphconv[web]")
         
     async def run():
         async with AsyncWebCrawler() as crawler:
