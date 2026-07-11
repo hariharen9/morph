@@ -1,4 +1,4 @@
-name: Publish to PyPI and Winget
+name: Release Pipeline
 
 on:
   push:
@@ -31,38 +31,57 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
-  build-windows-exe:
-    name: Build Windows Executable
-    runs-on: windows-latest
+  build-executables:
+    name: Build PyInstaller Executables
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: morph.exe
+          - os: ubuntu-latest
+            artifact_name: morph-linux-amd64.tar.gz
+          - os: macos-latest
+            artifact_name: morph-darwin-amd64.tar.gz
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install dependencies and PyInstaller
+          
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install .
           pip install pyinstaller
-
+          
       - name: Build Executable
-        run: |
-          pyinstaller --name morph --onefile morph/cli.py
+        run: pyinstaller --name morph --onefile morph/cli.py
 
+      - name: Package Unix Binary
+        if: runner.os != 'Windows'
+        run: |
+          mkdir artifacts
+          tar -czvf artifacts/${{ matrix.artifact_name }} -C dist morph
+          
+      - name: Package Windows Binary
+        if: runner.os == 'Windows'
+        run: |
+          mkdir artifacts
+          # For windows, we just move the exe so it can be uploaded directly
+          mv dist/morph.exe artifacts/${{ matrix.artifact_name }}
+          
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/morph.exe
+          files: artifacts/${{ matrix.artifact_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   winget-publish:
     name: Publish to Winget
-    needs: build-windows-exe
+    needs: build-executables
     runs-on: ubuntu-latest
     steps:
       - name: Submit to Winget
@@ -71,3 +90,115 @@ jobs:
           identifier: hariharen.morph
           installers-regex: '\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
+
+  scoop-publish:
+    name: Publish to Scoop
+    needs: build-executables
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        
+      - name: Generate Manifest and Push
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          URL="https://github.com/hariharen9/morph/releases/download/v${VERSION}/morph.exe"
+          
+          curl -sL $URL -o morph.exe
+          SHA256=$(sha256sum morph.exe | awk '{print $1}')
+          
+          cat <<EOF > morph.json
+          {
+              "version": "$VERSION",
+              "description": "The Universal File Converter for the Command Line.",
+              "homepage": "https://github.com/hariharen9/morph",
+              "license": "MIT",
+              "architecture": {
+                  "64bit": {
+                      "url": "$URL",
+                      "hash": "$SHA256"
+                  }
+              },
+              "bin": "morph.exe",
+              "checkver": "github",
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/hariharen9/morph/releases/download/v\$version/morph.exe"
+                      }
+                  }
+              }
+          }
+          EOF
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git clone https://x-access-token:${{ secrets.TAP_GITHUB_TOKEN }}@github.com/hariharen9/scoop-bucket.git
+          mkdir -p scoop-bucket/bucket
+          cp morph.json scoop-bucket/bucket/morph.json
+          
+          cd scoop-bucket
+          git add bucket/morph.json
+          git commit -m "Update morph to v$VERSION" || echo "No changes"
+          git push origin main || echo "Push failed"
+
+  homebrew-publish:
+    name: Publish to Homebrew
+    needs: build-executables
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        
+      - name: Generate Formula and Push
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          
+          MAC_URL="https://github.com/hariharen9/morph/releases/download/v${VERSION}/morph-darwin-amd64.tar.gz"
+          LINUX_URL="https://github.com/hariharen9/morph/releases/download/v${VERSION}/morph-linux-amd64.tar.gz"
+          
+          curl -sL $MAC_URL -o mac.tar.gz
+          curl -sL $LINUX_URL -o lin.tar.gz
+          
+          MAC_SHA=$(sha256sum mac.tar.gz | awk '{print $1}')
+          LINUX_SHA=$(sha256sum lin.tar.gz | awk '{print $1}')
+          
+          cat <<EOF > morph.rb
+          class Morph < Formula
+            desc "The Universal File Converter for the Command Line."
+            homepage "https://github.com/hariharen9/morph"
+            version "$VERSION"
+            license "MIT"
+
+            if OS.mac?
+              url "$MAC_URL"
+              sha256 "$MAC_SHA"
+            elsif OS.linux?
+              url "$LINUX_URL"
+              sha256 "$LINUX_SHA"
+            end
+
+            def install
+              bin.install "morph"
+            end
+
+            test do
+              system "#{bin}/morph", "--version"
+            end
+          end
+          EOF
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git clone https://x-access-token:${{ secrets.TAP_GITHUB_TOKEN }}@github.com/hariharen9/homebrew-tap.git
+          mkdir -p homebrew-tap/Formula
+          cp morph.rb homebrew-tap/Formula/morph.rb
+          
+          cd homebrew-tap
+          git add Formula/morph.rb
+          git commit -m "Update morph to v$VERSION" || echo "No changes"
+          git push origin main || echo "Push failed"
