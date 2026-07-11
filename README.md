@@ -1,10 +1,11 @@
 <div align="center">
 
-# 🦋 morph
+# 🦋 MORPH
 
 **The Universal File Converter for the Command Line.**
 
 *One command. No format-specific tools to remember. No cloud upload. No API keys.*
+*Convert anything, to anything.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -49,6 +50,32 @@ Whether you are rendering a 3D `.blend` file to a `.png`, scraping a Wikipedia a
 
 ## 📦 Installation
 
+`morph` is natively distributed across all major operating systems. You do not need Python installed to use the standalone binaries!
+
+### Windows
+```powershell
+# via Winget (Recommended)
+winget install hariharen.morph
+
+# via Scoop
+scoop bucket add morph https://github.com/hariharen9/scoop-bucket.git
+scoop install morph
+```
+
+### macOS & Linux
+```bash
+# via Homebrew
+brew tap hariharen9/homebrew-tap
+brew install morph
+```
+
+### Python Ecosystem (PyPI)
+If you prefer managing via `pip` (or `pipx`), install it globally:
+```bash
+pipx install morph
+```
+
+### Development (Source)
 ```bash
 git clone https://github.com/hariharen9/morph.git
 cd morph
