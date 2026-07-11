@@ -72,7 +72,7 @@ brew install morph
 ### Python Ecosystem (PyPI)
 If you prefer managing via `pip` (or `pipx`), install it globally:
 ```bash
-pipx install morph
+pipx install morphconv
 ```
 
 ### Development (Source)
