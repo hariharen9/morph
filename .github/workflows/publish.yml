@@ -81,6 +81,7 @@ jobs:
 
   winget-publish:
     name: Publish to Winget
+    if: false
     needs: build-executables
     runs-on: ubuntu-latest
     steps:
