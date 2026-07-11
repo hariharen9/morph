@@ -106,6 +106,8 @@ _DEFAULT_OPTIONS = [
 ]
 
 for _src in FORMATS:
+    if _src == "pdf":
+        continue  # Pillow can save to PDF, but cannot rasterize arbitrary PDFs
     for _dst, _dst_pil in FORMATS.items():
         if _dst == _src:
             continue

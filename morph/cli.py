@@ -250,7 +250,7 @@ def init_config():
 def run_cmd(
     ctx: typer.Context,
     input_file: str = typer.Argument(..., help="Source file or URL (http/https)."),
-    output_file: Path = typer.Argument(..., help="Destination file (extension picks the target format)."),
+    output_file: Optional[Path] = typer.Argument(None, help="Destination file (extension picks the target format)."),
     js: bool = typer.Option(False, "--js", help="Use headless browser to render JavaScript on URLs."),
     yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm dependency installs."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show the conversion plan without running it."),
@@ -261,7 +261,35 @@ def run_cmd(
     if not quiet:
         console.print("\n[bold cyan]⚡ MORPH[/bold cyan] [dim]— Convert anything to anything.[/dim]\n")
 
-    src, dst = _fmt_of(input_file), _fmt_of(output_file)
+    src = _fmt_of(input_file)
+    
+    if output_file is None:
+        targets = registry.reachable_targets(src)
+        if not targets:
+            err_console.print(f"[error]✗ No known conversions from {src}[/error]")
+            raise typer.Exit(1)
+            
+        import rich.prompt
+        options_list = sorted(targets.keys())
+        console.print(f"\n[bold]Select target format for {src}:[/bold]")
+        for i, t in enumerate(options_list, 1):
+            console.print(f"  [cyan]{i}.[/cyan] {t}")
+            
+        choice = rich.prompt.IntPrompt.ask(
+            "\nEnter number", 
+            choices=[str(i) for i in range(1, len(options_list) + 1)],
+            show_choices=False
+        )
+        chosen_fmt = options_list[choice - 1]
+        
+        if input_file.startswith("http://") or input_file.startswith("https://"):
+            output_file = Path(f"output.{chosen_fmt}")
+        else:
+            output_file = Path(input_file).with_suffix(f".{chosen_fmt}")
+            
+        console.print(f"[dim]Saving to {output_file}[/dim]\n")
+
+    dst = _fmt_of(output_file)
     path = registry.find_path(src, dst)
 
     if path is None:
@@ -325,13 +353,30 @@ def run_cmd(
         err_console.print(f"[error]✗ File not found:[/error] {input_file}")
         raise typer.Exit(1)
 
+    domain_hint = ""
+    if path and len(path) > 0:
+        start_fam = path[0].family
+        end_fam = path[-1].family
+        if start_fam != end_fam:
+            if start_fam in ("document", "web") and end_fam == "data":
+                domain_hint = "  [muted](extracts tabular data only)[/muted]"
+            elif start_fam == "data" and end_fam == "document":
+                domain_hint = "  [muted](renders data as a document)[/muted]"
+            elif start_fam == "video" and end_fam == "audio":
+                domain_hint = "  [muted](extracts audio track only)[/muted]"
+            elif start_fam == "document" and end_fam == "image":
+                domain_hint = "  [muted](renders document to image)[/muted]"
+            else:
+                domain_hint = f"  [muted](cross-domain: {start_fam} → {end_fam})[/muted]"
+
     hop_str = " → ".join([src] + [s.dst for s in path])
     display_name = input_file if (is_webpage_scrape or is_remote_file) else input_path.name
     if not quiet:
         console.print(Panel.fit(
             f"[bold]{display_name}[/bold] → [bold]{output_file.name}[/bold]\n"
             f"[muted]route:[/muted] {hop_str}"
-            + ("  [warning](lossy step involved)[/warning]" if any(s.lossy for s in path) else ""),
+            + ("  [warning](lossy step involved)[/warning]" if any(s.lossy for s in path) else "")
+            + domain_hint,
             title="morph", border_style="cyan",
         ))
 
