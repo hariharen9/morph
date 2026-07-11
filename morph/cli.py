@@ -6,13 +6,15 @@ morph — convert anything to anything, from the CLI.
   morph data.csv data.xlsx --table-style TableStyleMedium2 --header-bg 2E7D32
   morph data.csv data.xlsx --help      (shows flags for THIS pair only)
   morph batch '*.mp4' mp3 --workers 4
+  morph pack '*.png' photos/ report.docx archive.zip
+  morph pack project/ backup.tar.gz --recursive
   morph formats docx
   morph history
   morph deps
   morph                                 (no args -> launches the interactive TUI)
 
 There is no "convert" subcommand — morph already means convert. Anything
-that isn't a recognized subcommand (formats, deps, batch, history) is
+that isn't a recognized subcommand (formats, deps, batch, history, pack) is
 treated as a conversion job and routed through the engine.
 """
 
@@ -85,7 +87,7 @@ class MorphGroup(TyperGroup):
     def resolve_command(self, ctx, args):
         # We explicitly allow "config" alongside whatever is in self.commands
         # just in case Typer hasn't fully populated the commands dict yet.
-        known_commands = list(self.commands.keys()) + ["config", "init"]
+        known_commands = list(self.commands.keys()) + ["config", "init", "pack"]
         if args and args[0] not in known_commands and not args[0].startswith("-"):
             args = ["run", *args]
         return super().resolve_command(ctx, args)
@@ -550,6 +552,163 @@ def batch_cmd(
 
     console.print("\n[dim]Built with 💖 by [link=https://hariharen.site]Hariharen[/link][/dim]\n")
     raise typer.Exit(0 if result.failed == 0 else 1)
+
+
+
+# ── pack ──────────────────────────────────────────────────────────────────────
+
+@app.command(
+    "pack",
+    help="Pack any files or globs into a single archive (zip, 7z, tar.gz, tar.bz2, tar.xz).",
+)
+def pack_cmd(
+    inputs: List[str] = typer.Argument(..., help="Files, globs, or directories to pack. Last argument is the output archive path."),
+    recursive: bool = typer.Option(False, "-r", "--recursive", help="Recurse into directories."),
+    strip_top_level: bool = typer.Option(False, "--strip-top-level", help="Drop a single shared top-level directory from paths inside the archive."),
+    quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress output."),
+) -> None:
+    import glob as _glob
+    import zipfile
+    import tarfile
+    import os
+
+    if not quiet:
+        console.print("\n[bold cyan]⚡ MORPH[/bold cyan] [dim]— Pack anything.[/dim]\n")
+
+    if len(inputs) < 2:
+        err_console.print("[error]✗ Provide at least one input and an output archive path.[/error]")
+        err_console.print("  [muted]Example: morph pack *.png photos.zip[/muted]")
+        err_console.print("  [muted]Example: morph pack docs/ report.tar.gz --recursive[/muted]")
+        raise typer.Exit(1)
+
+    *patterns, output_str = inputs
+    output_path = Path(output_str)
+
+    # Determine archive format from extension
+    name_lower = output_path.name.lower()
+    if name_lower.endswith(".tar.gz") or name_lower.endswith(".tgz"):
+        fmt = "tar.gz"
+    elif name_lower.endswith(".tar.bz2") or name_lower.endswith(".tbz2"):
+        fmt = "tar.bz2"
+    elif name_lower.endswith(".tar.xz") or name_lower.endswith(".txz"):
+        fmt = "tar.xz"
+    elif name_lower.endswith(".tar"):
+        fmt = "tar"
+    elif name_lower.endswith(".7z"):
+        fmt = "7z"
+    elif name_lower.endswith(".zip"):
+        fmt = "zip"
+    else:
+        err_console.print(
+            f"[error]✗ Cannot determine archive format from:[/error] [bold]{output_path.name}[/bold]\n"
+            "  [muted]Supported: .zip  .7z  .tar  .tar.gz  .tar.bz2  .tar.xz[/muted]"
+        )
+        raise typer.Exit(1)
+
+    # Collect all matching files, preserving relative paths
+    collected: list[Path] = []
+    seen: set[Path] = set()
+
+    for pattern in patterns:
+        p = Path(pattern)
+        if p.is_dir():
+            glob_pat = "**/*" if recursive else "*"
+            matches = [f for f in p.glob(glob_pat) if f.is_file()]
+        else:
+            # Expand shell-style globs
+            expanded = [Path(m) for m in _glob.glob(pattern, recursive=recursive)]
+            if not expanded:
+                err_console.print(f"[warning]⚠ No files matched:[/warning] {pattern}")
+                continue
+            matches = []
+            for m in expanded:
+                if m.is_dir():
+                    if recursive:
+                        matches.extend(f for f in m.rglob("*") if f.is_file())
+                    else:
+                        err_console.print(f"[warning]⚠ Skipping directory (use --recursive):[/warning] {m}")
+                else:
+                    matches.append(m)
+
+        for f in matches:
+            resolved = f.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                collected.append(f)
+
+    if not collected:
+        err_console.print("[error]✗ No files matched the given patterns.[/error]")
+        raise typer.Exit(1)
+
+    # Compute archive-internal paths: strip common root so paths are relative
+    abs_collected = [f.resolve() for f in collected]
+    if len(abs_collected) == 1:
+        common = abs_collected[0].parent
+    else:
+        # Find longest common ancestor directory
+        from pathlib import PurePath
+        parts_list = [p.parts for p in abs_collected]
+        common_parts = []
+        for parts in zip(*parts_list):
+            if len(set(parts)) == 1:
+                common_parts.append(parts[0])
+            else:
+                break
+        common = Path(*common_parts) if common_parts else Path("/")
+
+    def arcname(f: Path) -> str:
+        try:
+            rel = f.resolve().relative_to(common)
+        except ValueError:
+            rel = Path(f.name)
+        return str(rel)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not quiet:
+        console.print(Panel.fit(
+            f"Packing [bold]{len(collected)}[/bold] file(s) into [bold]{output_path.name}[/bold]  [muted]({fmt})[/muted]",
+            title="morph pack", border_style="cyan",
+        ))
+
+    t_start = time.perf_counter()
+
+    try:
+        if fmt == "zip":
+            with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for f in abs_collected:
+                    zf.write(f, arcname(f))
+
+        elif fmt in ("tar", "tar.gz", "tar.bz2", "tar.xz"):
+            _modes = {"tar": "w:", "tar.gz": "w:gz", "tar.bz2": "w:bz2", "tar.xz": "w:xz"}
+            with tarfile.open(output_path, _modes[fmt]) as tf:
+                for f in abs_collected:
+                    tf.add(f, arcname=arcname(f))
+
+        elif fmt == "7z":
+            try:
+                import py7zr
+            except ImportError:
+                err_console.print("[error]✗ py7zr is required for .7z packing.[/error]")
+                err_console.print("  [muted]Install: pip install py7zr[/muted]")
+                raise typer.Exit(1)
+            with py7zr.SevenZipFile(output_path, mode="w") as sz:
+                for f in abs_collected:
+                    sz.write(f, arcname(f))
+
+    except Exception as exc:
+        err_console.print(f"[error]✗ Pack failed:[/error] {exc}")
+        raise typer.Exit(1)
+
+    elapsed = time.perf_counter() - t_start
+    size_kb = output_path.stat().st_size / 1024
+
+    if not quiet:
+        console.print(
+            f"[success]✓ Done![/success]  → [accent]{output_path}[/accent]"
+            f"  ({len(collected)} files, {size_kb:.1f} KB, {elapsed:.2f}s)"
+        )
+        console.print("\n[dim]Built with 💖 by [link=https://hariharen.site]Hariharen[/link][/dim]\n")
 
 
 # ── formats ───────────────────────────────────────────────────────────────────
