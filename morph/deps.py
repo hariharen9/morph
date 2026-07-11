@@ -82,6 +82,11 @@ _WHY = {
     "tomlkit": "reads and writes TOML files, preserving comments and key ordering",
     "nbconvert": "exports Jupyter notebooks to HTML, PDF, Python, Markdown and more (with real cell outputs)",
     "img2pdf": "embeds images into PDF without transcoding — lossless, smaller files than Pillow's PDF writer",
+    "rawpy": "decodes Camera RAW files (CR2, NEF, ARW, DNG, RAF, ORF, RW2, etc.) via LibRaw",
+    "qrcode": "generates QR codes from text or URLs as images",
+    "pyzbar": "decodes QR codes and barcodes from images",
+    "markdownify": "converts HTML to Markdown preserving tables, code blocks, and document structure",
+    "weasyprint": "renders HTML+CSS directly to PDF — faithful to modern CSS (flexbox, grid, custom fonts)",
 }
 
 
