@@ -18,6 +18,7 @@ morph report.docx report.pdf
 morph data.csv data.xlsx --table-style TableStyleMedium2 --header-bg 2E7D32
 morph logo.png logo.svg --mode spline
 morph batch '*.mp4' mp3 --workers 4
+morph pack '*.png' photos/ doc.pdf archive.zip
 ```
 
 </div>
@@ -41,6 +42,7 @@ Whether you are rendering a 3D `.blend` file to a `.png`, scraping a Wikipedia a
 - **Output Verification.** Pass the `--verify` flag to calculate and display the exact SHA-256 checksum of the resulting file right alongside the success message.
 - **Transparent Remote Downloads.** Pass any `http://` link and `morph` handles the rest. It uses `trafilatura` to scrape web articles into clean Markdown, or `yt-dlp` to natively download high-quality media (`morph <url> --audio`).
 - **Batch Processing Engine.** `morph batch '*.mp4' mp3` converts files concurrently with a live progress table, smart skip logic (`--newer-only`, `--skip-existing`), and output structure mirroring.
+- **Pack Command.** Run `morph pack *.png output.zip` to collect any number of files, globs, or directories into a single archive (zip/7z/tar.gz), with auto-stripped common paths.
 - **Interactive TUI.** Type `morph` with no arguments to launch a stunning, keyboard-driven Textual UI. Navigate your filesystem, preview conversion options, and watch live progress bars without touching your mouse.
 - **Automated Dependency Management.** Missing `ffmpeg` or `pandoc`? `morph` detects your OS and package manager (brew/apt/winget/etc.), shows you the exact install command, and asks before running it. Massive dependencies (like 3D rendering engines) are cleanly isolated as optional extras!
 - **Pluggable Architecture.** Drop a Python script in `morph/converters/`, add a `@register` decorator, and it's instantly live in the routing graph.
@@ -205,20 +207,24 @@ During batch conversions, `morph` displays a live status table:
 
 | Domain | Formats | Backend |
 |---|---|---|
-| **Data** | `csv`, `xlsx`, `json`, `yaml`, `parquet`, `feather`, `ods`, `xml`, `html`, `sqlite` | Native (`pandas` / `openpyxl`) |
-| **Documents** | `md`, `html`, `docx`, `odt`, `rtf`, `epub`, `latex`, `rst`, `txt`, `ipynb`, `pptx`, `adoc`, `org`, `opml`, `man`, `pdf`* | `pandoc` |
-| **Images (Raster)** | `png`, `jpg/jpeg`, `webp`, `bmp`, `gif`, `tiff`, `ico`, `heic`, `avif`, `icns`, `pdf` | `Pillow` / `cairosvg` |
+| **Data** | `csv`, `xlsx`, `json`, `yaml`, `toml`, `parquet`, `feather`, `ods`, `xml`, `html`, `sqlite` | Native (`pandas` / `tomlkit`) |
+| **Documents** | `md`, `html`, `docx`, `odt`, `rtf`, `epub`, `latex`, `rst`, `txt`, `pptx`, `adoc`, `org`, `opml`, `man` | `pandoc` |
+| **Legacy Office** | `doc`, `xls`, `ppt` | `LibreOffice (soffice)` |
+| **Notebooks** | `ipynb` | `nbconvert` (executes & renders outputs) |
+| **PDF** | `pdf` (real text, layout, tables, generation) | `pymupdf` / `pdfplumber` / `pdf2docx` |
+| **Images (Raster)** | `png`, `jpg/jpeg`, `webp`, `bmp`, `gif`, `tiff`, `ico`, `heic`, `avif`, `icns` | `Pillow` / `cairosvg` |
 | **Vectorization** | `png`/`jpg`/etc. → `svg` | `vtracer` |
 | **3D Models** | `obj`, `stl`, `fbx`, `gltf`, `glb`, `blend`, `any → png` (Render) | `bpy` (Blender) |
 | **Web Extraction** | `url` → `md`, `txt`, `xml`, `html` | `trafilatura` / `crawl4ai` |
 | **Audio** | `mp3`, `wav`, `flac`, `ogg`, `aac`, `m4a`, `opus`, `wma` | `ffmpeg` |
 | **Video** | `mp4`, `mkv`, `mov`, `webm`, `avi`, `flv`, `wmv`, `mpeg` | `ffmpeg` |
+| **Subtitles** | `srt`, `vtt`, `ass`, `ssa`, `sub`, `sami` | `pysubs2` |
 | **Ebooks** | `epub`, `mobi`, `azw3` | `ebook-convert` |
 | **Fonts** | `ttf`, `otf`, `woff`, `woff2` | `fontTools` |
 | **OCR** | `png`, `jpg`, `webp`, `pdf`, etc. → `txt` | `tesseract` |
-| **Archives** | `zip`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz` | Python stdlib |
+| **Archives** | `zip`, `7z`, `tar`, `tar.gz`, `tar.bz2`, `tar.xz`, `rar`* | Python stdlib / `py7zr` / `rarfile` |
 
-*\* Note: PDF is an output-only format for documents. Extracting structured text back out of a PDF is handled via the OCR pipeline.*
+*\* Note: RAR is an extract-only format (RAR creation requires proprietary tools).*
 
 ---
 
