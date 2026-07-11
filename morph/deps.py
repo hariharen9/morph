@@ -76,6 +76,8 @@ _WHY = {
     "pymupdf": "extracts text, layout, and images from digital PDFs without OCR",
     "pdfplumber": "extracts tables and structured data from PDFs",
     "pdf2docx": "converts PDFs to DOCX with layout preserved",
+    "py7zr": "reads and writes 7-Zip (.7z) archives",
+    "rarfile": "extracts RAR archives (creation requires a proprietary tool)",
 }
 
 
