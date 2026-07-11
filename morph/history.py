@@ -90,6 +90,66 @@ def read_entries(
     except OSError:
         return []
     return entries[-limit:]
+def pop_last_operation() -> list[HistoryEntry]:
+    """Remove and return all entries belonging to the last operation (single or batch)."""
+    if not HISTORY_FILE.exists():
+        return []
+    
+    entries: list[HistoryEntry] = []
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                entries.append(HistoryEntry(
+                    ts=d.get("ts", ""),
+                    src_path=d.get("src_path", ""),
+                    src_fmt=d.get("src_fmt", ""),
+                    dst_path=d.get("dst_path", ""),
+                    dst_fmt=d.get("dst_fmt", ""),
+                    route=d.get("route", ""),
+                    backend=d.get("backend", ""),
+                    success=d.get("success", True),
+                    elapsed_s=d.get("elapsed_s", 0.0),
+                    mode=d.get("mode", "single"),
+                    batch_id=d.get("batch_id"),
+                    error=d.get("error"),
+                    extra=d.get("extra", {}),
+                ))
+    except OSError:
+        return []
+        
+    if not entries:
+        return []
+        
+    last_entry = entries[-1]
+    popped: list[HistoryEntry] = []
+    remaining: list[HistoryEntry] = []
+    
+    if last_entry.mode == "batch" and last_entry.batch_id:
+        for e in entries:
+            if e.batch_id == last_entry.batch_id:
+                popped.append(e)
+            else:
+                remaining.append(e)
+    else:
+        popped = [last_entry]
+        remaining = entries[:-1]
+        
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            for e in remaining:
+                f.write(json.dumps(asdict(e), ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+        
+    return popped
+
 
 
 def clear() -> bool:

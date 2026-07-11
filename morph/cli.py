@@ -254,6 +254,7 @@ def run_cmd(
     js: bool = typer.Option(False, "--js", help="Use headless browser to render JavaScript on URLs."),
     yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm dependency installs."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show the conversion plan without running it."),
+    verify: bool = typer.Option(False, "--verify", help="Print the SHA-256 checksum of the output file."),
     quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress banners and tables."),
 ) -> None:
     from . import history as hist
@@ -429,6 +430,15 @@ def run_cmd(
             extras.append(f"{result.rows:,} rows")
         if result.pages is not None:
             extras.append(f"{result.pages} pages")
+            
+        if verify and output_file.exists():
+            import hashlib
+            h = hashlib.sha256()
+            with open(output_file, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    h.update(chunk)
+            extras.append(f"sha256: {h.hexdigest()[:12]}")
+            
         extra_str = f"  ({', '.join(extras)})" if extras else ""
         console.print(f"[success]✓ Done![/success]  → [accent]{output_file}[/accent]{extra_str}")
         console.print("\n[dim]Built with 💖 by [link=https://hariharen.site]Hariharen[/link][/dim]\n")
@@ -617,6 +627,45 @@ def formats_cmd(
     console.print()
     console.print("  [muted]Run [bold]morph formats <format>[/bold] to see all reachable targets from any format.[/muted]")
     console.print()
+
+
+@app.command(
+    "undo",
+    help="Undo the last conversion operation by deleting generated files and removing the history log.",
+)
+def undo_cmd(
+    ctx: typer.Context,
+    quiet: bool = typer.Option(False, "-q", "--quiet", help="Suppress output."),
+) -> None:
+    from .history import pop_last_operation
+    popped = pop_last_operation()
+    
+    if not popped:
+        if not quiet:
+            err_console.print("[warning]No history found to undo.[/warning]")
+        raise typer.Exit(0)
+        
+    deleted_count = 0
+    for entry in popped:
+        if entry.success and entry.dst_path:
+            p = Path(entry.dst_path)
+            if p.exists():
+                try:
+                    p.unlink()
+                    deleted_count += 1
+                except OSError:
+                    pass
+                    
+    if not quiet:
+        mode = popped[-1].mode
+        if mode == "batch":
+            console.print(f"[success]✓ Undid last batch conversion[/success] ({deleted_count} files deleted, {len(popped)} history entries removed).")
+        else:
+            entry = popped[-1]
+            if deleted_count > 0:
+                console.print(f"[success]✓ Undid last conversion[/success] — deleted [accent]{Path(entry.dst_path).name}[/accent] ({entry.src_fmt} → {entry.dst_fmt}).")
+            else:
+                console.print(f"[success]✓ Undid last conversion[/success] in history, but [accent]{Path(entry.dst_path).name}[/accent] was already deleted or missing.")
 
 
 # ── history ───────────────────────────────────────────────────────────────────
